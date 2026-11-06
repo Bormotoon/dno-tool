@@ -18,9 +18,9 @@ from src.workers.setup.installers.system_vnc import (
 from src.workers.setup.templates import _KMSVNC_SERVICE_TEMPLATE
 
 RPM = BundledRpm(
-    file_name="kmsvnc-0.0.6-3.20240625git190db24.dno-rosa2021.1.x86_64.rpm",
-    sha256="be711caef03d63021986d3a0e7e6776c036f0b4fc38ab9d545ab514236afbc67",
-    evr="0.0.6-3.20240625git190db24.dno",
+    file_name="kmsvnc-0.0.6-6.20240625git190db24.dno-rosa2021.1.x86_64.rpm",
+    sha256="3b4c53c15a74ca036a9a3d9ab386e397669ad272b9e26984e724361cc16df2b8",
+    evr="0.0.6-6.20240625git190db24.dno",
 )
 RPM_ARCH = "x86_64"
 # Старшая версия символов glibc в программе (objdump -T): пакет собран
@@ -33,10 +33,9 @@ INCOMPATIBLE_HINT = "Выберите x11vnc (сеанс X11) или KRFB (Wayla
 
 
 # Видеодрайверы, для которых в kmsvnc есть способ прочитать кадр
-# (drm_vendors в drm.c). i915 проверен; nvidia читает только 8-битные кадры
-# старой раскладки, а KWin на NVIDIA даёт 10-битный AB30 в блочной
-# раскладке — поэтому NVIDIA не поддерживается.
-SUPPORTED_DRIVERS = ("i915", "amdgpu", "vmwgfx", "vboxvideo", "virtio_gpu")
+# (drm_vendors в drm.c). NVIDIA читает AB30/BLOCK_LINEAR через EGL DMA-BUF;
+# импорт и чтение проверяются до открытия VNC-порта.
+SUPPORTED_DRIVERS = ("i915", "amdgpu", "vmwgfx", "vboxvideo", "virtio_gpu", "nvidia")
 
 # Видеокарты: имя, драйвер, подключён ли монитор, устойчивый путь
 # (/dev/dri/by-path: номер cardN может смениться после перезагрузки).
@@ -98,11 +97,6 @@ def choose_card(gpus) -> HostCheck:
         if driver in SUPPORTED_DRIVERS:
             return HostCheck(True, card=path)
     drivers = sorted({driver or "неизвестен" for _n, driver, _c, _p in displaying})
-    if "nvidia" in drivers:
-        return HostCheck(
-            False,
-            "Видеокарта NVIDIA: kmsvnc не умеет читать с неё изображение экрана",
-        )
     return HostCheck(
         False, f"Видеодрайвер {', '.join(drivers)} kmsvnc не поддерживает"
     )

@@ -113,7 +113,7 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-Environment=XKB_DEFAULT_LAYOUT=us
+Environment=XKB_DEFAULT_LAYOUT=us,ru
 ExecStartPre=/usr/bin/test -s /etc/kmsvnc/passwd
 ExecStart=/usr/bin/kmsvnc -w -p {port} -d {card} --password-file /etc/kmsvnc/passwd
 Restart=always

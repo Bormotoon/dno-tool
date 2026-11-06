@@ -12,8 +12,17 @@ New-Item -ItemType Directory -Force $Out | Out-Null
 $Packaging = (& wsl.exe -d $Distribution -- wslpath -a -u ((Join-Path $ProjectRoot 'packaging/kmsvnc').Replace('\', '/'))).Trim()
 $LinuxOut = (& wsl.exe -d $Distribution -- wslpath -a -u ($Out.Replace('\', '/'))).Trim()
 # Скрипт читается через tr: в Windows-checkout возможны CRLF.
-& wsl.exe -d $Distribution -u root -- bash -c "KMSVNC_PACKAGING='$Packaging' bash <(tr -d '\r' < '$Packaging/build.sh') '$LinuxOut'"
-if ($LASTEXITCODE -ne 0) { throw "Сборка kmsvnc завершилась с кодом $LASTEXITCODE" }
+# Podman пишет обычный ход сборки в stderr; Windows PowerShell не должен
+# прерывать native-процесс на таком сообщении. Ошибку определяет код выхода.
+$PreviousErrorAction = $ErrorActionPreference
+try {
+    $ErrorActionPreference = 'Continue'
+    & wsl.exe -d $Distribution -u root -- bash -c "KMSVNC_PACKAGING='$Packaging' bash <(tr -d '\r' < '$Packaging/build.sh') '$LinuxOut'"
+    $BuildExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $PreviousErrorAction
+}
+if ($BuildExitCode -ne 0) { throw "Сборка kmsvnc завершилась с кодом $BuildExitCode" }
 Get-ChildItem $Out -Filter 'kmsvnc-*.rpm' | ForEach-Object {
     '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
 }

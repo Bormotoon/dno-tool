@@ -727,9 +727,15 @@ class NodeService(BaseService):
                 )
             )
         if not attempts:
-            if master_only or (not secret and self.master_key_supported()):
+            if master_only:
                 return "", "Нужен служебный ключ: загрузите его"
-            return "", "Нет ключа доступа к ноде"
+            error = (
+                "Открытый ключ ноды сохранён, но отсутствует секрет доступа "
+                "для текущего протокола. Укажите полный ключ доступа из настроек удалённой ноды"
+            )
+            if self.master_key_supported():
+                error += " либо загрузите служебный ключ"
+            return "", error
         error = ""
         for field_name, respond in attempts:
             r = transport.post(f"{base}/api/node/challenge", json={}, timeout=timeout)
@@ -775,7 +781,7 @@ class NodeService(BaseService):
         ):
             return False, "Параметры подключения изменились", None
         if not rec.pubkey:
-            return False, "Нет ключа доступа к ноде", None
+            return False, "Не сохранён открытый ключ ноды. Укажите полный ключ доступа", None
         from src.utils.security.ban import BAN_MESSAGE, is_banned
 
         if is_banned():
@@ -926,7 +932,7 @@ class NodeService(BaseService):
         if rec is None:
             return False, "Нода не найдена", {}
         if not rec.pubkey:
-            return False, "Нет ключа доступа к ноде", {}
+            return False, "Не сохранён открытый ключ ноды. Укажите полный ключ доступа", {}
 
         from src.utils.security.node_transport import NodeHTTPSession, node_base_url
 

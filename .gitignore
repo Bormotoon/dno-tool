@@ -222,3 +222,6 @@ master-key.pub
 
 # Рецепт сборки пакета kmsvnc нужен в репозитории
 !/packaging/kmsvnc/build.sh
+
+# Исходники kmsvnc хранятся в отдельном форке
+/packaging/kmsvnc/src/

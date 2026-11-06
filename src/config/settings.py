@@ -1033,8 +1033,7 @@ def load_thumbnail_config(data: dict) -> ThumbnailConfig:
 # VNC-серверы, которые ставит мастер настройки на хосты.
 VNC_SERVERS = ("kmsvnc", "x11vnc", "krfb")
 # Сервер по умолчанию: kmsvnc работает и в X11, и в Wayland, показывает
-# экран входа. Видеокарты NVIDIA не поддерживает: такой хост мастер
-# пропускает с объяснением.
+# экран входа. NVIDIA захватывается через EGL DMA-BUF.
 DEFAULT_VNC_SERVER = "kmsvnc"
 
 

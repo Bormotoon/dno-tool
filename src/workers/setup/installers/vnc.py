@@ -61,8 +61,7 @@ class VncInstaller(PhasedInstaller):
         )
         if "wayland" in detected and selected == "x11vnc":
             message = (
-                "На хосте сеанс Wayland: x11vnc его не видит. Выберите kmsvnc "
-                "(для видеокарт NVIDIA — KRFB)."
+                "На хосте сеанс Wayland: x11vnc его не видит. Выберите kmsvnc или KRFB."
             )
             self.context.log(request.device.host, "vnc", f"x11vnc: хост не подходит. {message}")
             return PhaseResult(RESULT_ERROR, message)
