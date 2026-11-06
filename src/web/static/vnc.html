@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ru" class="vnc_loading">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#000000">
+    <link rel="icon" href="favicon.ico">
+    <title>DNO Tool — Удалённый доступ</title>
+    <style>
+        /* ===== noVNC-style control bar, adapted to dark dno theme ===== */
+
+        :root {
+            --vnc-blue: #16213e;
+            --vnc-darkblue: #0f1a30;
+            --vnc-accent: #0f3460;
+            --vnc-accent2: #1a4e7e;
+            --vnc-panel-bg: rgba(22, 33, 62, 0.97);
+            --vnc-panel-border: #0f3460;
+            --vnc-text: #e0e0e0;
+            --vnc-text-muted: #a0b0d0;
+            --vnc-text-dim: #8090b0;
+            --vnc-btn-border: rgba(255, 255, 255, 0.2);
+            --vnc-btn-selected-bg: rgba(0, 0, 0, 0.5);
+            --vnc-btn-selected-border: rgba(0, 0, 0, 0.8);
+            --vnc-grey: #494949;
+            --vnc-darkgrey: #1a1a2e;
+            --vnc-lightgrey: #2a2a3e;
+            --vnc-yellow: #b8860b;
+            --vnc-green: #2e6e1a;
+            --vnc-red: #6e1a1a;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            line-height: 1.6;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { height: 100%; }
+        body {
+            background: #000;
+            color: var(--vnc-text);
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* ===== Spinner ===== */
+        .vnc_spinner { position: relative; }
+        .vnc_spinner, .vnc_spinner::before, .vnc_spinner::after {
+            width: 10px; height: 10px; border-radius: 2px;
+            box-shadow: -60px 10px 0 rgba(255,255,255,0);
+            animation: vnc_spinner 1.0s linear infinite;
+        }
+        .vnc_spinner::before { content: ""; position: absolute; left: 0; top: 0; animation-delay: -0.1s; }
+        .vnc_spinner::after { content: ""; position: absolute; top: 0; left: 0; animation-delay: 0.1s; }
+        @keyframes vnc_spinner {
+            0% { box-shadow: -60px 10px 0 rgba(255,255,255,0); width: 20px; }
+            25% { box-shadow: 20px 10px 0 rgba(255,255,255,1); width: 10px; }
+            50% { box-shadow: 60px 10px 0 rgba(255,255,255,0); width: 10px; }
+        }
+
+        /* ===== Centering ===== */
+        .vnc_center {
+            display: flex; align-items: center; justify-content: center;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+        }
+        .vnc_center > * { pointer-events: auto; }
+        .vnc_crosscenter {
+            display: flex !important; flex-direction: column; justify-content: center;
+            position: fixed; top: 0; left: 0; height: 100%; margin: 0 !important; padding: 0 !important;
+            pointer-events: none;
+        }
+        .vnc_crosscenter > * { pointer-events: auto; }
+        .vnc_right .vnc_crosscenter { left: auto; right: 0; }
+        .vnc_top .vnc_crosscenter, .vnc_top.vnc_crosscenter { flex-direction: row; width: 100%; height: auto; }
+        .vnc_bottom .vnc_crosscenter, .vnc_bottom.vnc_crosscenter { flex-direction: row; width: 100%; height: auto; top: auto; bottom: 0; }
+
+        /* ===== Control bar anchor ===== */
+        #vnc_control_bar_anchor {
+            position: fixed; z-index: 10;
+            transition: 0.5s ease-in-out;
+            transform: translateX(0);
+        }
+        :root.vnc_connected #vnc_control_bar_anchor.vnc_idle { opacity: 0.8; }
+        #vnc_control_bar_anchor:is(.vnc_top, .vnc_bottom) { transform: translateY(0); }
+        #vnc_control_bar_anchor.vnc_right { left: auto; right: 0; }
+        #vnc_control_bar_anchor.vnc_bottom { top: auto; bottom: 0; }
+
+        /* ===== Control bar ===== */
+        #vnc_control_bar {
+            position: relative; left: -100%;
+            transition: 0.5s ease-in-out;
+            background-color: var(--vnc-blue);
+            border-radius: 0 12px 12px 0;
+            border-right: 1px solid var(--vnc-accent);
+        }
+        .vnc_right #vnc_control_bar { left: 100%; border-radius: 12px 0 0 12px; border-right: none; border-left: 1px solid var(--vnc-accent); }
+        .vnc_top #vnc_control_bar { left: auto; top: -55px; border-radius: 0 0 12px 12px; border-right: none; border-bottom: 1px solid var(--vnc-accent); }
+        .vnc_bottom #vnc_control_bar { left: auto; top: 55px; border-radius: 12px 12px 0 0; border-right: none; border-top: 1px solid var(--vnc-accent); }
+        #vnc_control_bar.vnc_open {
+            box-shadow: 6px 6px 0px rgba(0,0,0,0.5);
+            left: 0;
+        }
+        :is(.vnc_top, .vnc_bottom) #vnc_control_bar.vnc_open { left: auto; top: 0; }
+        #vnc_control_bar::before {
+            content: ""; position: absolute; z-index: -1; height: 100%; width: 30px; left: -30px;
+            transition: box-shadow 0.5s ease-in-out;
+        }
+        .vnc_right #vnc_control_bar::before { visibility: hidden; }
+        .vnc_top #vnc_control_bar::before { height: 30px; width: 100%; top: -30px; bottom: auto; }
+        .vnc_bottom #vnc_control_bar::before { visibility: hidden; }
+        #vnc_control_bar.vnc_open::before { box-shadow: 6px 6px 0px rgba(0,0,0,0.5); }
+
+        /* ===== Drag handle ===== */
+        #vnc_control_bar_handle {
+            position: absolute; left: -15px; top: 0;
+            transform: translateY(35px);
+            width: calc(100% + 30px); height: 50px; z-index: -1;
+            cursor: pointer; border-radius: 6px;
+            background-color: var(--vnc-darkblue);
+            box-shadow: 3px 3px 0px rgba(0,0,0,0.5);
+        }
+        :root:not(.vnc_connected) #vnc_control_bar_handle { display: none; }
+        :is(.vnc_top, .vnc_bottom) #vnc_control_bar_handle { transform: translateX(35px); top: -15px; left: 0; width: 50px; height: calc(100% + 30px); }
+        #vnc_control_bar_handle::after {
+            content: ""; transition: transform 0.5s ease-in-out;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='10'%3E%3Cpath d='M0 0L6 5L0 10' stroke='%23a0b0d0' stroke-width='1.5' fill='none'/%3E%3C/svg%3E") no-repeat center;
+            background-size: 6px 10px; position: absolute; top: 20px; right: 3px;
+            width: 10px; height: 10px; transform-origin: center;
+        }
+        .vnc_right #vnc_control_bar_handle::after { left: 3px; right: auto; transform: rotate(180deg); }
+        .vnc_top #vnc_control_bar_handle::after { left: 20px; right: auto; top: auto; bottom: 3px; transform: rotate(90deg); }
+        .vnc_bottom #vnc_control_bar_handle::after { left: 20px; right: auto; top: 3px; bottom: auto; transform: rotate(-90deg); }
+        #vnc_control_bar.vnc_open #vnc_control_bar_handle::after { transform: translateX(1px) rotate(180deg); }
+        .vnc_right #vnc_control_bar.vnc_open #vnc_control_bar_handle::after { transform: translateX(-1px); }
+        .vnc_top #vnc_control_bar.vnc_open #vnc_control_bar_handle::after { transform: translateY(1px) rotate(-90deg); }
+        .vnc_bottom #vnc_control_bar.vnc_open #vnc_control_bar_handle::after { transform: translateY(-1px) rotate(90deg); }
+        #vnc_control_bar_handle div {
+            position: absolute; left: auto; right: -35px; top: 0; width: 50px; height: 100%; display: none;
+        }
+        @media (any-pointer: coarse) { #vnc_control_bar_handle div { display: initial; } }
+
+        /* Hide keyboard button on non-touch devices */
+        @media not all and (any-pointer: coarse) {
+            :root.vnc_connected #vnc_keyboard_button { display: none; }
+        }
+        :root:not(.vnc_connected) #vnc_keyboard_button { display: none; }
+        :root:not(.vnc_connected) #vnc_toggle_extra_keys_button { display: none; }
+        :root:not(.vnc_connected) #vnc_clipboard_button { display: none; }
+        :root:not(.vnc_connected) #vnc_disconnect_button { display: none; }
+        .vnc_right #vnc_control_bar_handle div { left: -35px; right: auto; }
+        .vnc_top #vnc_control_bar_handle div { left: 0; right: auto; top: auto; bottom: -35px; width: 100%; height: 50px; }
+        .vnc_bottom #vnc_control_bar_handle div { left: 0; right: auto; top: -35px; bottom: auto; width: 100%; height: 50px; }
+
+        /* ===== Scroll area ===== */
+        #vnc_control_bar > .vnc_scroll {
+            max-height: 100vh; overflow-x: hidden; overflow-y: auto; padding: 10px;
+            display: flex; flex-direction: column; justify-content: flex-start; align-items: center; gap: 10px 0;
+        }
+        :is(.vnc_top, .vnc_bottom) > #vnc_control_bar > .vnc_scroll {
+            max-width: 100vw; overflow-x: auto; overflow-y: hidden; flex-direction: row; gap: 0 10px;
+        }
+
+        /* ===== Buttons ===== */
+        #vnc_control_bar .vnc_button {
+            min-width: unset; padding: 4px; border: 1px solid var(--vnc-btn-border);
+            border-radius: 6px; background-color: transparent; cursor: pointer;
+            color: var(--vnc-text); display: flex; align-items: center; justify-content: center;
+            width: 35px; height: 35px;
+        }
+        #vnc_control_bar .vnc_button:hover { background-color: rgba(255,255,255,0.1); }
+        #vnc_control_bar .vnc_button.vnc_selected {
+            border-color: var(--vnc-btn-selected-border); background-color: var(--vnc-btn-selected-bg);
+        }
+        #vnc_control_bar .vnc_button.vnc_hidden { display: none !important; }
+        #vnc_control_bar .vnc_button svg { width: 20px; height: 20px; fill: none; stroke: var(--vnc-text); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        /* ===== Logo ===== */
+        #vnc_control_bar .vnc_logo {
+            display: block; max-width: 35px; max-height: 35px; object-fit: contain;
+            color: var(--vnc-yellow); font-weight: bold; font-size: 11px; text-align: center;
+            line-height: 35px; text-shadow: 0.1em 0.1em 0 black;
+        }
+        .vnc_logo + hr { border: none; border-top: 1px solid rgba(255,255,255,0.2); width: 35px; height: 1px; margin: 0; }
+        :is(.vnc_top, .vnc_bottom) .vnc_logo + hr { border-left: 1px solid rgba(255,255,255,0.2); border-top: none; width: 1px; height: 35px; }
+
+        /* ===== Panels ===== */
+        .vnc_panel {
+            transform: translateX(25px); transition: 0.5s ease-in-out;
+            box-sizing: border-box; max-width: calc(100vw - 75px - 25px); max-height: calc(100vh - 75px - 25px);
+            overflow-x: hidden; overflow-y: auto; padding: 15px;
+            background: var(--vnc-panel-bg); border-radius: 12px; color: var(--vnc-text);
+            border: 1px solid var(--vnc-panel-border); box-shadow: 6px 6px 0px rgba(0,0,0,0.5);
+            visibility: hidden; opacity: 0;
+        }
+        .vnc_panel.vnc_open { visibility: visible; opacity: 1; transform: translateX(75px); }
+        .vnc_right .vnc_panel { transform: translateX(-25px); }
+        .vnc_right .vnc_panel.vnc_open { transform: translateX(-75px); }
+        .vnc_top .vnc_panel { transform: translateY(25px); }
+        .vnc_top .vnc_panel.vnc_open { transform: translateY(75px); }
+        .vnc_bottom .vnc_panel { transform: translateY(-25px); }
+        .vnc_bottom .vnc_panel.vnc_open { transform: translateY(-75px); }
+        .vnc_panel > * { display: block; margin: 10px auto; }
+        .vnc_panel > *:first-child { margin-top: 0 !important; }
+        .vnc_panel > *:last-child { margin-bottom: 0 !important; }
+        .vnc_panel hr { border: none; border-top: 1px solid var(--vnc-lightgrey); width: 100%; }
+        .vnc_panel label { display: block; white-space: nowrap; margin: 5px; }
+        .vnc_panel li { margin: 5px; list-style: none; }
+        .vnc_panel .vnc_heading {
+            background-color: var(--vnc-accent); border-radius: 6px; padding: 5px 8px;
+            display: flex; align-items: center; gap: 6px; color: white; font-size: 16px; font-weight: bold;
+            white-space: nowrap;
+        }
+        .vnc_panel .vnc_heading svg { width: 18px; height: 18px; fill: none; stroke: white; stroke-width: 2; }
+        .vnc_panel input[type=button], .vnc_panel input[type=submit] {
+            width: 100%; padding: 6px 12px; border: 1px solid var(--vnc-accent); border-radius: 6px;
+            background: var(--vnc-accent2); color: var(--vnc-text); cursor: pointer; font-size: 14px;
+        }
+        .vnc_panel input[type=button]:hover, .vnc_panel input[type=submit]:hover { background: var(--vnc-accent); }
+        .vnc_panel input[type=button].vnc_selected {
+            border-color: var(--vnc-yellow); background: var(--vnc-accent);
+            color: #fff; box-shadow: inset 0 0 8px rgba(184,134,11,0.5);
+        }
+        .vnc_panel textarea {
+            width: 360px; min-width: 150px; height: 160px; min-height: 70px; box-sizing: border-box; max-width: 100%;
+            background: var(--vnc-darkgrey); color: var(--vnc-text); border: 1px solid var(--vnc-accent);
+            border-radius: 6px; padding: 8px; font-family: monospace; font-size: 13px; resize: vertical;
+        }
+        .vnc_panel select {
+            background: var(--vnc-darkgrey); color: var(--vnc-text); border: 1px solid var(--vnc-accent);
+            border-radius: 4px; padding: 3px 6px; font-size: 13px;
+        }
+        .vnc_panel input[type=range] { width: 100%; accent-color: var(--vnc-accent2); vertical-align: middle; }
+
+        /* ===== Expanders ===== */
+        .vnc_expander { cursor: pointer; font-weight: bold; color: var(--vnc-text-muted); }
+        .vnc_expander::before {
+            content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cpath d='M2 1L6 4L2 7' stroke='%23a0b0d0' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+            display: inline-block; margin-right: 5px; transition: 0.2s ease-in-out;
+        }
+        .vnc_expander.vnc_open::before { transform: rotateZ(90deg); }
+        .vnc_expander ~ * { margin: 5px; margin-left: 10px; padding: 5px; background: rgba(0,0,0,0.04); border-radius: 6px; }
+        .vnc_expander:not(.vnc_open) ~ * { display: none; }
+
+        /* ===== Modifiers panel ===== */
+        #vnc_modifiers {
+            background-color: var(--vnc-darkgrey); border: none; padding: 10px;
+            display: flex; flex-direction: column; justify-content: flex-start; align-items: center; gap: 10px 0;
+        }
+        #vnc_modifiers > * { margin: 0; }
+        :is(.vnc_top, .vnc_bottom) #vnc_modifiers { flex-direction: row; gap: 0 10px; }
+
+        /* ===== Settings panel ===== */
+        #vnc_settings ul { list-style: none; padding: 0; }
+        #vnc_settings button, #vnc_settings select, #vnc_settings textarea,
+        #vnc_settings input:not([type=checkbox]):not([type=radio]) { margin-left: 6px; max-width: calc(100% - 6px); }
+
+        /* ===== Status ===== */
+        #vnc_status {
+            position: fixed; top: 0; left: 0; width: 100%; z-index: 100;
+            transform: translateY(-100%); cursor: pointer; transition: 0.5s ease-in-out;
+            visibility: hidden; opacity: 0; padding: 5px;
+            display: flex; flex-direction: row; justify-content: center; align-content: center;
+            line-height: 1.6; word-wrap: break-word; color: #fff;
+            border-bottom: 1px solid rgba(0,0,0,0.9);
+        }
+        #vnc_status.vnc_open { transform: translateY(0); visibility: visible; opacity: 1; }
+        #vnc_status.vnc_status_normal { background: rgba(22,33,62,0.9); }
+        #vnc_status.vnc_status_error { background: rgba(110,26,26,0.9); }
+        #vnc_status.vnc_status_warn { background: rgba(180,150,30,0.9); }
+        #vnc_status.vnc_status_success { background: rgba(30,120,60,0.92); }
+
+        /* ===== Transition screen ===== */
+        #vnc_transition {
+            transition: 0.5s ease-in-out; display: flex; opacity: 0; visibility: hidden;
+            position: fixed; top: 0; left: 0; bottom: 0; right: 0;
+            color: white; background: rgba(0,0,0,0.5); z-index: 50;
+            align-items: center; justify-content: center; flex-direction: column;
+        }
+        :root.vnc_loading #vnc_transition, :root.vnc_connecting #vnc_transition,
+        :root.vnc_disconnecting #vnc_transition, :root.vnc_reconnecting #vnc_transition {
+            opacity: 1; visibility: visible;
+        }
+        #vnc_transition_text { font-size: 1.5em; margin-bottom: 20px; }
+
+        /* ===== Canvas container ===== */
+        #vnc_container {
+            width: 100vw; height: 100vh; background-color: #000; overflow: hidden; position: relative;
+        }
+        #vncCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        #vnc_container canvas { image-rendering: pixelated; cursor: default; }
+        #vnc_keyboardinput {
+            width: 1px; height: 1px; background-color: #fff; color: #fff; border: 0;
+            position: absolute; left: -40px; z-index: -1; ime-mode: disabled;
+        }
+
+        /* ===== Veyon banner ===== */
+        .vnc_veyon_banner {
+            position: fixed; top: 0; left: 0; right: 0;
+            background: var(--vnc-yellow); color: #fff; font-size: 13px;
+            padding: 8px 32px 8px 14px; text-align: center; z-index: 30;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.4);
+            display: flex; align-items: center; justify-content: center; gap: 12px;
+        }
+        .vnc_veyon_banner.hidden { display: none; }
+        .vnc_veyon_banner_close {
+            position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+            background: rgba(0,0,0,0.25); color: #fff; border: none; border-radius: 3px;
+            cursor: pointer; font-size: 14px; padding: 2px 8px;
+        }
+        .vnc_veyon_banner_close:hover { background: rgba(0,0,0,0.45); }
+
+        /* ===== Toast ===== */
+        .toast-container {
+            position: fixed; top: 60px; right: 16px;
+            display: flex; flex-direction: column; gap: 8px; z-index: 100; pointer-events: none;
+        }
+        .toast {
+            background: var(--vnc-panel-bg); border: 1px solid var(--vnc-panel-border);
+            border-radius: 6px; padding: 10px 16px; color: var(--vnc-text); font-size: 13px;
+            animation: fadeIn 0.2s; max-width: 320px; word-wrap: break-word;
+        }
+        .toast.success { border-color: var(--vnc-green); }
+        .toast.error { border-color: var(--vnc-red); }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* ===== Checkbox styling ===== */
+        .vnc_panel input[type=checkbox].toggle {
+            accent-color: var(--vnc-accent2);
+        }
+
+        /* ===== Control bar hint ===== */
+        .vnc_hint_anchor { position: fixed; left: -50px; }
+        .vnc_hint_anchor.vnc_right { left: auto; right: -50px; }
+        .vnc_hint_anchor.vnc_top { left: auto; top: -50px; }
+        .vnc_hint_anchor.vnc_bottom { left: auto; top: auto; bottom: -50px; }
+        .vnc_control_bar_hint {
+            width: 100px; height: 50%; max-height: 600px; position: relative; transform: scale(0);
+            visibility: hidden; opacity: 0; transition: 0.2s ease-in-out; background: transparent;
+            box-shadow: 0 0 10px black, inset 0 0 10px 10px var(--vnc-darkblue); border-radius: 12px;
+        }
+        .vnc_control_bar_hint.vnc_active { visibility: visible; opacity: 1; transition-delay: 0.2s; transform: scale(1); }
+        .vnc_control_bar_hint.vnc_notransition { transition: none !important; }
+
+        /* ===== Custom tooltip ===== */
+        #vncTooltip {
+            position: fixed; z-index: 10000; max-width: 220px; padding: 6px 10px;
+            background: rgba(22, 33, 62, 0.97); color: var(--vnc-text);
+            border: 1px solid var(--vnc-panel-border); border-radius: 6px;
+            box-shadow: 3px 3px 0px rgba(0,0,0,0.5); font-size: 12px; line-height: 1.4;
+            white-space: normal; text-align: left; pointer-events: none;
+            opacity: 0; transition: opacity 0.15s ease-in-out;
+        }
+        #vncTooltip:not(.hidden) { opacity: 1; }
+        #vncTooltip.hidden { display: none; }
+    </style>
+</head>
+<body>
+    <!-- Custom tooltip -->
+    <div id="vncTooltip" class="hidden"></div>
+
+    <!-- Veyon warning banner -->
+    <div class="vnc_veyon_banner hidden" id="vncVeyonBanner">
+        <span>&#9888; Режим Veyon: ограниченная поддержка — без clipboard, file transfer, resize. Установите x11vnc для полноценного доступа.</span>
+        <button class="vnc_veyon_banner_close" id="vncVeyonBannerClose" data-tip="Скрыть">&#10005;</button>
+    </div>
+
+    <!-- Control bar -->
+    <div id="vnc_control_bar_anchor" class="vnc_crosscenter">
+        <div id="vnc_control_bar">
+            <div id="vnc_control_bar_handle" data-tip="Скрыть/показать панель"><div></div></div>
+
+            <div class="vnc_scroll">
+                <div class="vnc_logo">DNO</div>
+                <hr>
+
+                <!-- Drag viewport -->
+                <button class="vnc_button vnc_hidden" id="vnc_view_drag_button" data-tip="Перетаскивание экрана">
+                    <svg viewBox="0 0 24 24"><path d="M12 2v6M12 16v6M2 12h6M16 12h6M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3"/></svg>
+                </button>
+
+                <!-- Keyboard (touch) -->
+                <button class="vnc_button" id="vnc_keyboard_button" data-tip="Показать клавиатуру">
+                    <svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M8 14h8"/></svg>
+                </button>
+
+                <!-- Extra keys -->
+                <button class="vnc_button" id="vnc_toggle_extra_keys_button" data-tip="Дополнительные клавиши">
+                    <svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h4M14 10h4M10 14h4"/><path d="M20 2v4M22 4h-4" stroke-width="1.5"/></svg>
+                </button>
+                <div class="vnc_crosscenter">
+                    <div id="vnc_modifiers" class="vnc_panel">
+                        <input type="button" id="vnc_toggle_ctrl_button" value="Ctrl" data-tip="Зажать Ctrl">
+                        <input type="button" id="vnc_toggle_alt_button" value="Alt" data-tip="Зажать Alt">
+                        <input type="button" id="vnc_toggle_windows_button" value="Win" data-tip="Зажать Win">
+                        <input type="button" id="vnc_send_tab_button" value="Tab" data-tip="Отправить Tab">
+                        <input type="button" id="vnc_send_esc_button" value="Esc" data-tip="Отправить Esc">
+                        <input type="button" id="vnc_send_ctrl_alt_del_button" value="Ctrl+Alt+Del" data-tip="Отправить Ctrl+Alt+Del">
+                    </div>
+                </div>
+
+                <!-- Power -->
+                <button class="vnc_button" id="vnc_power_button" data-tip="Питание / Перезагрузка">
+                    <svg viewBox="0 0 24 24"><path d="M12 3v9M7.5 6.5a8 8 0 1 0 9 0"/></svg>
+                </button>
+                <div class="vnc_crosscenter">
+                    <div id="vnc_power" class="vnc_panel">
+                        <div class="vnc_heading">
+                            <svg viewBox="0 0 24 24"><path d="M12 3v9M7.5 6.5a8 8 0 1 0 9 0"/></svg>
+                            Питание
+                        </div>
+                        <input type="button" id="vnc_shutdown_button" value="Выключить">
+                        <input type="button" id="vnc_reboot_button" value="Перезагрузка">
+                        <input type="button" id="vnc_logoff_button" value="Завершить сеанс">
+                        <input type="button" id="vnc_power_on_button" value="Включить (WoL)">
+                        <hr>
+                        <input type="button" id="vnc_ssh_lock_button" value="Заблокировать экран" data-tip="Без Veyon: SSH и python3 на хосте">
+                        <input type="button" id="vnc_ssh_unlock_button" value="Разблокировать экран">
+                        <input type="button" id="vnc_ssh_lock_input_button" value="Заблокировать ввод" data-tip="Клавиатура и мышь хоста; управление из VNC остаётся">
+                        <input type="button" id="vnc_ssh_unlock_input_button" value="Разблокировать ввод">
+                    </div>
+                </div>
+
+                <!-- Veyon features (hidden if Veyon not installed) -->
+                <button class="vnc_button vnc_hidden" id="vnc_veyon_button" data-tip="Veyon">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C8 2 5 5 5 9v6c0 3 3 5 7 5s7-2 7-5V9c0-4-3-7-7-7z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                </button>
+                <div class="vnc_crosscenter">
+                    <div id="vnc_veyon" class="vnc_panel">
+                        <div class="vnc_heading">
+                            <svg viewBox="0 0 24 24"><path d="M12 2C8 2 5 5 5 9v6c0 3 3 5 7 5s7-2 7-5V9c0-4-3-7-7-7z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                            Veyon
+                        </div>
+                        <input type="button" id="vnc_veyon_lock_button" value="Блокировка экрана">
+                        <input type="button" id="vnc_veyon_unlock_button" value="Разблокировка экрана">
+                        <input type="button" id="vnc_veyon_message_button" value="Отправить сообщение">
+                        <hr>
+                        <input type="button" id="vnc_veyon_restart_button" value="Перезагрузить сервис Veyon">
+                    </div>
+                </div>
+
+                <!-- Clipboard -->
+                <button class="vnc_button" id="vnc_clipboard_button" data-tip="Буфер обмена">
+                    <svg viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/></svg>
+                </button>
+                <div class="vnc_crosscenter">
+                    <div id="vnc_clipboard" class="vnc_panel">
+                        <div class="vnc_heading">
+                            <svg viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/></svg>
+                            Буфер обмена
+                        </div>
+                        <p style="font-size:12px;color:var(--vnc-text-muted);">Содержимое буфера обмена:</p>
+                        <textarea id="vnc_clipboard_text" rows="5"></textarea>
+                    </div>
+                </div>
+
+                <!-- Fullscreen -->
+                <button class="vnc_button vnc_hidden" id="vnc_fullscreen_button" data-tip="Полный экран">
+                    <svg viewBox="0 0 24 24"><path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6"/></svg>
+                </button>
+
+                <!-- Settings -->
+                <button class="vnc_button" id="vnc_settings_button" data-tip="Настройки">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.3l2-1.5-2-3.4-2.4 1a7 7 0 0 0-2.2-1.3L14 3h-4l-.3 2.5a7 7 0 0 0-2.2 1.3l-2.4-1-2 3.4 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.3l-2 1.5 2 3.4 2.4-1a7 7 0 0 0 2.2 1.3L10 21h4l.3-2.5a7 7 0 0 0 2.2-1.3l2.4 1 2-3.4-2-1.5A7 7 0 0 0 19 12z"/></svg>
+                </button>
+                <div class="vnc_crosscenter">
+                    <div id="vnc_settings" class="vnc_panel">
+                        <div class="vnc_heading">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.3l2-1.5-2-3.4-2.4 1a7 7 0 0 0-2.2-1.3L14 3h-4l-.3 2.5a7 7 0 0 0-2.2 1.3l-2.4-1-2 3.4 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.3l-2 1.5 2 3.4 2.4-1a7 7 0 0 0 2.2 1.3L10 21h4l.3-2.5a7 7 0 0 0 2.2-1.3l2.4 1 2-3.4-2-1.5A7 7 0 0 0 19 12z"/></svg>
+                            Настройки
+                        </div>
+                        <ul>
+                            <li><label><input id="vnc_setting_shared" type="checkbox" class="toggle"> Совместный сеанс</label></li>
+                            <li><label><input id="vnc_setting_view_only" type="checkbox" class="toggle"> Только просмотр</label></li>
+                            <li><hr></li>
+                            <li>
+                                <label for="vnc_setting_screen_region">Область просмотра:</label>
+                                <select id="vnc_setting_screen_region" name="vncScreenRegion">
+                                    <option value="all">Весь рабочий стол</option>
+                                    <option value="left">Экран 1</option>
+                                    <option value="right">Экран 2</option>
+                                </select>
+                            </li>
+                            <li><label><input id="vnc_setting_view_clip" type="checkbox" class="toggle"> Обрезка по окну</label></li>
+                            <li>
+                                <label for="vnc_setting_resize">Масштаб:</label>
+                                <select id="vnc_setting_resize" name="vncResize">
+                                    <option value="off">Нет</option>
+                                    <option value="scale">Масштабирование (локально)</option>
+                                    <option value="remote">Разрешение (сервер)</option>
+                                </select>
+                            </li>
+                            <li><hr></li>
+                            <li>
+                                <div class="vnc_expander">Дополнительно</div>
+                                <div><ul>
+                                    <li>
+                                        <label for="vnc_setting_codec">Кодек:</label>
+                                        <select id="vnc_setting_codec" name="vncCodec">
+                                            <option value="auto" selected>Авто</option>
+                                            <option value="tight">Tight (JPEG)</option>
+                                            <option value="zlib">Zlib</option>
+                                            <option value="raw">Raw</option>
+                                        </select>
+                                    </li>
+                                    <li>
+                                        <label for="vnc_setting_quality">Качество JPEG:</label>
+                                        <input id="vnc_setting_quality" type="range" min="0" max="9" value="6">
+                                    </li>
+                                    <li>
+                                        <label for="vnc_setting_compression">Уровень сжатия:</label>
+                                        <input id="vnc_setting_compression" type="range" min="0" max="9" value="2">
+                                    </li>
+                                </ul></div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Disconnect -->
+                <button class="vnc_button" id="vnc_disconnect_button" data-tip="Отключиться">
+                    <svg viewBox="0 0 24 24"><path d="M9 9a3 3 0 0 1 0 4l-2 2a3 3 0 0 1-4 0M15 15a3 3 0 0 1 0-4l2-2a3 3 0 0 1 4 0M3 3l18 18"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Control bar hints -->
+    <div class="vnc_hint_anchor vnc_crosscenter"><div class="vnc_control_bar_hint"></div></div>
+    <div class="vnc_hint_anchor vnc_right vnc_crosscenter"><div class="vnc_control_bar_hint"></div></div>
+    <div class="vnc_hint_anchor vnc_top vnc_crosscenter"><div class="vnc_control_bar_hint"></div></div>
+    <div class="vnc_hint_anchor vnc_bottom vnc_crosscenter"><div class="vnc_control_bar_hint"></div></div>
+
+    <!-- Status -->
+    <div id="vnc_status"></div>
+
+    <!-- Transition -->
+    <div id="vnc_transition">
+        <div id="vnc_transition_text">Подключение...</div>
+        <div><input type="button" id="vnc_cancel_reconnect_button" value="Отмена"></div>
+        <div class="vnc_spinner"></div>
+    </div>
+
+    <!-- Canvas -->
+    <div id="vnc_container">
+        <div id="vncCanvas"></div>
+        <textarea id="vnc_keyboardinput" autocapitalize="off" autocomplete="off" spellcheck="false" tabindex="-1"></textarea>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+    <script src="network-errors.js?v=1"></script>
+    <script type="module" src="vnc.js?v=41"></script>
+</body>
+</html>

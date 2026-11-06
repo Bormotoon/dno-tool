@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="depth" x2="0" y2="1">
+      <stop stop-color="#28586a"/><stop offset=".26" stop-color="#103b50"/>
+      <stop offset=".68" stop-color="#062432"/><stop offset="1" stop-color="#010b12"/>
+    </linearGradient>
+    <linearGradient id="light" x2=".2" y2="1">
+      <stop stop-color="#b4e9ed" stop-opacity=".4"/><stop offset=".6" stop-color="#67b4cc" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#49a5b5" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="surface" cx=".48" cy="0" r=".9">
+      <stop stop-color="#6aa9b8" stop-opacity=".3"/><stop offset="1" stop-color="#020e18" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette">
+      <stop offset=".4" stop-opacity="0"/><stop offset="1" stop-color="#000810" stop-opacity=".65"/>
+    </radialGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="22"/></filter>
+    <pattern id="dust" width="311" height="257" patternUnits="userSpaceOnUse">
+      <g fill="#bde2e9">
+        <circle cx="31" cy="74" r="1" opacity=".2"/><circle cx="157" cy="23" r="1.4" opacity=".1"/>
+        <circle cx="238" cy="165" r=".7" opacity=".3"/><circle cx="80" cy="222" r="1.2" opacity=".1"/>
+        <circle cx="287" cy="91" r=".6" opacity=".3"/><circle cx="139" cy="137" r=".8" opacity=".18"/>
+      </g>
+    </pattern>
+  </defs>
+  <path fill="url(#depth)" d="M0 0h1920v1080H0z"/>
+  <path fill="url(#surface)" d="M0 0h1920v1080H0z"/>
+  <g fill="url(#light)" filter="url(#soft)">
+    <path d="M190-60h50L80 940H-70z"/><path d="M470-60h75l-5 1030H320z"/>
+    <path d="M800-60h110l220 1000H750z"/><path d="M1160-60h60l500 1030h-280z"/>
+    <path d="M1470-60h95l550 980h-250z"/>
+  </g>
+  <path d="M0 1030q280-70 590-5t660-5 670-45v105H0z" fill="#010c14" opacity=".5"/>
+  <path fill="url(#dust)" d="M0 0h1920v1080H0z"/>
+  <path fill="url(#vignette)" d="M0 0h1920v1080H0z"/>
+</svg>

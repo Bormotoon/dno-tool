@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DNO Tool
+Comment=Network device management tool
+Comment[ru]=Инструмент управления сетевыми устройствами
+Exec=/opt/dno-tool/dno-tool
+Icon=dno-tool
+Terminal=false
+Categories=System;Network;Settings;
+Keywords=network;ssh;sftp;ping;
+StartupNotify=true

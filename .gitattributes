@@ -1,0 +1,15 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Shell-скрипты и файлы упаковки Linux: ТОЛЬКО LF.
+# Иначе checkout на Windows с core.autocrlf=true даст CRLF и shebang
+# `#!/usr/bin/env bash\r` не запустится: "/usr/bin/env: «bash\r»: нет файла".
+*.sh text eol=lf
+packaging/policykit/dno-tool-admin text eol=lf
+packaging/rpm/dno-tool.spec text eol=lf
+packaging/rpm/dno-tool.rpmlintrc text eol=lf
+packaging/linux/Containerfile text eol=lf
+packaging/policykit/*.policy text eol=lf
+packaging/policykit/*.desktop text eol=lf
+packaging/kmsvnc/* text eol=lf
+*.rpm binary

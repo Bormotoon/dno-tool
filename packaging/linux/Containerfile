@@ -1,0 +1,49 @@
+# Готовые Python, Qt и инструменты; из исходников собирается только PySide6.
+FROM docker.io/library/debian:11 AS base
+ENV DEBIAN_FRONTEND=noninteractive
+RUN sed -i 's|deb http://deb.debian.org/debian-security bullseye-security|deb [check-valid-until=no] http://archive.debian.org/debian-security bullseye-security|' /etc/apt/sources.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
+       binutils ca-certificates rpm cpio file tar gzip libgl1 libegl1 libopengl0 \
+    && rm -rf /var/lib/apt/lists/*
+FROM base AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends \
+       curl xz-utils unzip zip bzip2 ccache \
+    && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /cache/tools \
+    && if [ ! -f /cache/tools/micromamba-2.9.0-0 ]; then \
+         curl --fail --location --connect-timeout 15 --max-time 180 --retry 3 \
+           https://github.com/mamba-org/micromamba-releases/releases/download/2.9.0-0/micromamba-linux-64 \
+           -o /cache/tools/micromamba-2.9.0-0; fi \
+    && echo '366cd9cd8be14df1ab8ed50352a82111082a36686b2d389fdb79a92c3fafb3e3  /cache/tools/micromamba-2.9.0-0' | sha256sum -c - \
+    && install -m 755 /cache/tools/micromamba-2.9.0-0 /usr/local/bin/micromamba
+ENV MAMBA_ROOT_PREFIX=/opt/mamba CONDA_PKGS_DIRS=/cache/conda-pkgs
+RUN micromamba create -y -p /opt/native -c conda-forge --strict-channel-priority \
+       'python=3.15.1=*_cp315' 'libpython=3.15.1=*_cp315' \
+       pip cmake ninja patchelf cxx-compiler clangdev \
+       'qt6-main=6.12.0' 'qt6-multimedia=6.12.0' \
+    && micromamba list -p /opt/native --explicit > /opt/native-packages.txt
+ARG BUILD_JOBS=4
+ENV PATH="/opt/native/bin:${PATH}" \
+    CCACHE_DIR=/cache/ccache CCACHE_MAXSIZE=8G PIP_CACHE_DIR=/cache/pip
+COPY packaging/linux/*.py packaging/linux/*.sh packaging/linux/sources.json /opt/recipe/
+RUN micromamba run -p /opt/native bash /opt/recipe/build-toolchain.sh pyside
+COPY packaging/media/ /opt/recipe/media/
+COPY requirements.txt scripts/ensure_qt.py /opt/recipe/app/
+ARG ENVIRONMENT_REVISION=initial
+RUN echo "${ENVIRONMENT_REVISION}" > /opt/recipe/environment-revision \
+    && apt-get update && apt-get install -y --no-install-recommends pkg-config \
+    && micromamba run -p /opt/native bash /opt/recipe/build-toolchain.sh application \
+    && /opt/native/bin/python /opt/recipe/prepare-runtime.py \
+    && LD_LIBRARY_PATH=/opt/dno/.venv/lib/python3.15/site-packages/PySide6/Qt/lib:/opt/native/lib /opt/dno/.venv/bin/python /opt/recipe/media/bundle.py manifest
+FROM base
+RUN apt-get update && apt-get install -y --no-install-recommends xvfb xauth \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /opt/native/ /opt/native/
+COPY --from=builder /opt/dno/.venv/ /opt/dno/.venv/
+COPY --from=builder /opt/manifest/ /opt/manifest/
+COPY --from=builder /opt/recipe/verify_environment.py /opt/recipe/verify_environment.py
+ENV PATH="/opt/native/bin:${PATH}" PYTHONDONTWRITEBYTECODE=1
+ENV LD_LIBRARY_PATH=/opt/dno/.venv/lib/python3.15/site-packages/PySide6/Qt/lib:/opt/native/lib
+ENV DNO_SKIP_DEPENDENCY_INSTALL=1 DNO_BUILD_VENV=/opt/dno/.venv
+WORKDIR /work
+CMD ["bash", "scripts/build_rpm.sh"]

@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNO Tool - Руководство пользователя</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-code: #0d1117;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-hover: #7dd3fc;
+            --accent-dim: #0c4a6e;
+            --green: #4ade80;
+            --yellow: #fbbf24;
+            --red: #f87171;
+            --orange: #fb923c;
+            --purple: #a78bfa;
+            --border: #334155;
+            --sidebar-w: 270px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            display: flex;
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: var(--sidebar-w);
+            background: var(--bg-card);
+            border-right: 1px solid var(--border);
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+            overflow-y: auto;
+            padding: 20px 0;
+            z-index: 100;
+            transition: transform 0.3s;
+        }
+        .sidebar-logo {
+            padding: 0 20px 16px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 12px;
+        }
+        .sidebar-logo h2 { font-size: 1.2rem; color: var(--accent); letter-spacing: 1px; }
+        .sidebar-logo small { color: var(--text-muted); font-size: 0.78rem; }
+        .sidebar nav a {
+            display: block;
+            padding: 6px 20px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.86rem;
+            border-left: 3px solid transparent;
+            transition: all 0.15s;
+        }
+        .sidebar nav a:hover,
+        .sidebar nav a.active { color: var(--accent); background: var(--accent-dim); border-left-color: var(--accent); }
+        .sidebar nav .nav-group {
+            padding: 8px 20px 4px;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #475569;
+            margin-top: 10px;
+        }
+        .content {
+            margin-left: var(--sidebar-w);
+            flex: 1;
+            max-width: 920px;
+            padding: 36px 44px 80px;
+        }
+        .menu-toggle {
+            display: none;
+            position: fixed; top: 10px; left: 10px; z-index: 200;
+            background: var(--bg-card); border: 1px solid var(--border);
+            color: var(--accent); font-size: 1.4rem; padding: 6px 12px;
+            border-radius: 6px; cursor: pointer;
+        }
+        h1 { font-size: 2.2rem; margin-bottom: 8px; }
+        h2 {
+            font-size: 1.5rem; margin: 40px 0 14px;
+            padding-bottom: 6px; border-bottom: 2px solid var(--accent-dim);
+        }
+        h3 { font-size: 1.15rem; margin: 24px 0 8px; color: var(--accent-hover); }
+        p { margin-bottom: 10px; }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        code {
+            background: var(--bg-code); color: var(--green);
+            padding: 1px 7px; border-radius: 4px; font-size: 0.87rem;
+            font-family: 'Cascadia Code','Fira Code','JetBrains Mono',monospace;
+        }
+        pre {
+            background: var(--bg-code); border: 1px solid var(--border);
+            border-radius: 8px; padding: 14px 18px; margin: 10px 0 18px;
+            overflow-x: auto;
+        }
+        pre code { background: none; padding: 0; font-size: 0.84rem; line-height: 1.6; }
+        .card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 18px 22px; margin: 14px 0;
+        }
+        .card-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 14px; margin: 14px 0;
+        }
+        .card h4 { margin-top: 0; color: var(--accent); font-size: 0.95rem; }
+        .card ul { padding-left: 18px; }
+        .card li { margin-bottom: 3px; font-size: 0.9rem; }
+        .info-box {
+            border-left: 4px solid var(--accent); background: var(--accent-dim);
+            padding: 12px 18px; border-radius: 0 8px 8px 0; margin: 14px 0; font-size: 0.9rem;
+        }
+        .info-box.warn { border-color: var(--yellow); background: #422006; }
+        .info-box.danger { border-color: var(--red); background: #450a0a; }
+        .info-box.success { border-color: var(--green); background: #052e16; }
+        .info-box.orange { border-color: var(--orange); background: #431407; }
+        table {
+            width: 100%; border-collapse: collapse; margin: 10px 0 20px; font-size: 0.88rem;
+        }
+        th {
+            background: var(--bg-card); color: var(--accent); text-align: left;
+            padding: 8px 12px; border-bottom: 2px solid var(--border);
+        }
+        td { padding: 7px 12px; border-bottom: 1px solid var(--border); }
+        tr:hover td { background: var(--accent-dim); }
+        .badge {
+            display: inline-block; padding: 2px 10px; border-radius: 12px;
+            font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+        }
+        .badge-ssh { background: #4ade8022; color: var(--green); }
+        .badge-sftp { background: #38bdf822; color: var(--accent); }
+        .badge-local { background: #fbbf2422; color: var(--yellow); }
+        .steps { counter-reset: step; list-style: none; }
+        .steps li { margin-bottom: 8px; position: relative; padding-left: 32px; }
+        .steps li::before {
+            counter-increment: step; content: counter(step);
+            position: absolute; left: 0; top: 0;
+            background: var(--accent); color: var(--bg); font-weight: 700;
+            width: 22px; height: 22px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.75rem;
+        }
+        .feature-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px; margin: 14px 0;
+        }
+        .feature-item {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 8px; padding: 14px 16px; text-align: center;
+        }
+        .feature-item .icon { font-size: 1.6rem; margin-bottom: 6px; }
+        .feature-item .title { font-weight: 600; font-size: 0.9rem; }
+        .feature-item .desc { color: var(--text-muted); font-size: 0.8rem; margin-top: 4px; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        .toc {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin: 0 0 28px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 14px;
+        }
+        .toc a {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-decoration: none;
+            padding: 3px 0;
+            white-space: nowrap;
+        }
+        .toc a:hover { color: var(--accent); }
+        @media print {
+            .sidebar, .menu-toggle { display: none !important; }
+            .content { margin-left: 0; padding: 20px; }
+            body { background: white; color: black; }
+        }
+        @media (max-width: 860px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .content { margin-left: 0; padding: 16px 14px 60px; }
+            .menu-toggle { display: block; }
+        }
+    </style>
+</head>
+<body>
+
+<button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+
+<aside class="sidebar">
+    <div class="sidebar-logo">
+        <a href="#top" style="color:inherit;text-decoration:none;"><h2>DNO Tool</h2><small>Руководство пользователя</small></a>
+    </div>
+    <nav>
+        <div class="nav-group">Начало</div>
+        <a href="#intro">О программе</a>
+        <a href="#install">Установка</a>
+        <a href="#first-start">Первый запуск</a>
+        <a href="#system-tray">Системный трей</a>
+        <div class="nav-group">Устройства</div>
+        <a href="#devices-add">Добавление устройств</a>
+        <a href="#devices-manage">Управление устройствами</a>
+        <a href="#sftp-commander">Файловый командер</a>
+        <a href="#devices-monitor">Мониторинг доступности</a>
+        <a href="#recording">Запись экрана</a>
+        <div class="nav-group">Команды</div>
+        <a href="#commands-exec">Работа с командами</a>
+        <a href="#sftp">Передача файлов (SFTP)</a>
+        <div class="nav-group">Инструменты</div>
+        <a href="#setup-wizard">Мастер настройки</a>
+        <a href="#ip-scanner">IP-сканер</a>
+        <a href="#pinger">Пингер</a>
+        <a href="#topology">Карта сети</a>
+        <a href="#video-editor">Видеоредактор</a>
+        <a href="#cameras">Камеры ЕЦХД</a>
+        <div class="nav-group">Настройки</div>
+        <a href="#settings">Конфигурация</a>
+        <a href="#web-server">Веб-сервер управления</a>
+        <a href="#ssh-keys">Управление SSH-ключами</a>
+        <a href="#veyon">Veyon: мониторинг и доступ</a>
+        <a href="#remote-desktop">Удалённый рабочий стол</a>
+        <a href="#vnc-settings">Настройки VNC</a>
+        <a href="#krfb">KRFB - экран через KDE</a>
+        <a href="#diagnostics">Диагностика</a>
+        <a href="#commands-editor">Редактор команд</a>
+        <div class="nav-group">Вид</div>
+        <a href="#view-menu">Меню «Вид»</a>
+        <a href="#custom-panels">Пользовательские панели</a>
+        <div class="nav-group">Файл</div>
+        <a href="#export-import">Импорт и экспорт</a>
+        <div class="nav-group">Помощь</div>
+        <a href="#nodes">Ноды</a>
+        <a href="#troubleshooting">Если что-то не работает</a>
+        <a href="#update">Обновление</a>
+    </nav>
+</aside>
+
+<main class="content">
+
+<a id="top"></a>
+<h1>DNO Tool</h1>
+<p>Приложение для удалённого администрирования компьютеров на Linux (MOS/ALT) и Windows через SSH. Позволяет выполнять команды на десятках машин одновременно, передавать файлы, мониторить состояние устройств и управлять конфигурациями - всё из одного окна.</p>
+
+<div class="feature-grid">
+    <div class="feature-item">
+        <div class="icon">&#128187;</div>
+        <div class="title">Выполнение команд</div>
+        <div class="desc">SSH, SFTP, локально - параллельно на всех устройствах</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#128202;</div>
+        <div class="title">Мониторинг</div>
+        <div class="desc">Проверка доступности, TCP-ping, ICMP-графики</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#128196;</div>
+        <div class="title">Иерархия устройств</div>
+        <div class="desc">Папки, drag-and-drop, импорт из файлов</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#128295;</div>
+        <div class="title">Редактор команд</div>
+        <div class="desc">Создание своей библиотеки, импорт/экспорт</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#128228;</div>
+        <div class="title">SFTP-передача</div>
+        <div class="desc">Загрузка и скачивание файлов по SFTP</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#128274;</div>
+        <div class="title">SSH-ключи</div>
+        <div class="desc">Массовая установка открытых ключей</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#128269;</div>
+        <div class="title">IP-сканер</div>
+        <div class="desc">Автоматическое обнаружение устройств в сети</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#127909;</div>
+        <div class="title">Запись экрана</div>
+        <div class="desc">FFmpeg/GStreamer: экран и камера</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#128247;</div>
+        <div class="title">Камеры ЕЦХД</div>
+        <div class="desc">Просмотр и запись IP-камер по RTSP</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#128229;</div>
+        <div class="title">Системный трей</div>
+        <div class="desc">Сворачивание в трей, иконка статуса выполнения команд</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#128065;</div>
+        <div class="title">Veyon</div>
+        <div class="desc">Живые миниатюры экранов, просмотр и управление</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#127760;</div>
+        <div class="title">Веб-сервер управления</div>
+        <div class="desc">Управление устройствами и командами через браузер</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#9881;&#65039;</div>
+        <div class="title">Мастер настройки</div>
+        <div class="desc">Пошаговая первоначальная настройка: устройства, ключи, команды, Veyon</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#128506;</div>
+        <div class="title">Карта сети</div>
+        <div class="desc">Граф топологии: подсети, маршруты, роутеры и хосты</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#127916;</div>
+        <div class="title">Видеоредактор</div>
+        <div class="desc">Нарезка и склейка записей на таймлайне, текст, экспорт MP4/MKV</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#128205;</div>
+        <div class="title">Пользовательские панели</div>
+        <div class="desc">Свои панели с кнопками частых команд в один клик</div>
+    </div>
+    <div class="feature-item">
+        <div class="icon">&#128187;&#65039;</div>
+        <div class="title">KRFB</div>
+        <div class="desc">Общий экран через KDE: просмотр и управление через krdc или браузер</div>
+    </div>
+</div>
+
+<!-- ============ НАЧАЛО ============ -->
+<h2 id="intro">О программе</h2>
+<p>DNO Tool предназначен для системных администраторов, которым нужно управлять парком рабочих станций. Для команд и передачи файлов достаточно настроенного SSH-доступа. Для просмотра и управления экраном на удалённом компьютере дополнительно нужен Veyon или VNC-сервер.</p>
+
+<p>Основные возможности:</p>
+<ul>
+    <li>Управление пакетами, службами, пользователями на удалённых машинах</li>
+    <li>Мониторинг ресурсов, сети, дисков, логов</li>
+    <li>Настройка безопасности: SELinux, SSH, аудит, firewall</li>
+    <li>Передача файлов по SFTP, установка SSH-ключей</li>
+    <li>Удалённая запись экрана (FFmpeg и GStreamer)</li>
+    <li>Мониторинг экранов через Veyon: живые миниатюры, просмотр и управление</li>
+    <li>Доступ к экранам через VNC (x11vnc) и KRFB: просмотр и управление из krdc или браузера</li>
+    <li>Карта сети: граф топологии с подсетями, маршрутами и роутерами</li>
+    <li>Нарезка и склейка записей во встроенном видеоредакторе</li>
+    <li>Пользовательские панели с кнопками частых команд в один клик</li>
+    <li>Настройка KDE/Plasma на рабочих станциях</li>
+    <li>Сканирование сети, проверка доступности устройств</li>
+</ul>
+
+<h2 id="install">Установка</h2>
+
+<table>
+    <tr><th>Требование</th><th>Минимум</th></tr>
+    <tr><td>ОС (администратор)</td><td>Windows 10+ или Linux</td></tr>
+    <tr><td>ОС (целевые машины)</td><td>Любой Linux с SSH-сервером</td></tr>
+    <tr><td>Сетевой доступ</td><td>SSH (порт 22) до целевых машин</td></tr>
+</table>
+
+<h3>Windows</h3>
+<ol class="steps">
+    <li>Скачайте <code>dno-tool-X.X.X-windows.zip</code> с релиза на GitHub</li>
+    <li>Распакуйте в удобную папку</li>
+    <li>Запустите <code>dno-tool.exe</code></li>
+</ol>
+
+<h3>Linux (RPM)</h3>
+<ol class="steps">
+    <li>Скачайте <code>пакет RPM для вашей версии МОС (12 или 13)</code> с релиза</li>
+    <li>Установите: <code>sudo dnf install ./dno-tool-*.rpm</code></li>
+    <li>Запустите через меню приложений или <code>dno-tool</code></li>
+</ol>
+
+
+<div class="info-box">
+    Для работы программы необходимо, чтобы файл <code>commands.json</code> находился в директории <code>~/.dno-tool/</code>. Загрузите библиотеку на шаге «Команды» мастера настройки или импортируйте свой файл. Обновление программы не заменяет вашу библиотеку.
+</div>
+
+<h2 id="first-start">Первый запуск</h2>
+
+<p>Настройки и пользовательские данные хранятся в директории <code>~/.dno-tool/</code> (файлы появляются по мере настройки и сохранения):</p>
+<table>
+    <tr><th>Файл</th><th>Назначение</th></tr>
+    <tr><td><code>settings.json</code></td><td>Настройки приложения (SSH, сеть)</td></tr>
+    <tr><td><code>hosts.json</code></td><td>Список устройств</td></tr>
+    <tr><td><code>commands.json</code></td><td>Библиотека команд</td></tr>
+    <tr><td><code>dno-tool.log</code></td><td>Файл логов</td></tr>
+</table>
+
+<p>Если при первом старте у вас нет ни списка устройств, ни списка команд, автоматически запустится <strong>мастер первоначальной настройки</strong> - он проведёт вас по всем шагам (см. ниже).</p>
+
+<p>Для начала работы нужно:</p>
+<ol class="steps">
+    <li>Добавить хотя бы одно устройство (см. ниже)</li>
+    <li>Указать IP-адрес/hostname и связку учётных данных для SSH-доступа</li>
+    <li>Отметить устройство галочкой, выбрать команду и нажать <strong>Выполнить</strong></li>
+</ol>
+
+<h2 id="system-tray">Системный трей</h2>
+
+<p>DNO Tool может работать в фоновом режиме, сворачиваясь в системный трей. Это удобно при длительных операциях (выполнение команд на десятках машин, запись экрана, мониторинг): окно можно спрятать, а программа продолжит работу.</p>
+
+<h3>Поведение</h3>
+<ul>
+    <li><strong>Закрытие окна</strong> (крестик или <kbd>Alt+F4</kbd>) - скрывает окно в трей, приложение остаётся работать в фоне</li>
+    <li><strong>Клик по иконке трея</strong> - показывает/прячет окно</li>
+    <li><strong>Контекстное меню трея</strong> - пункты «Открыть» (показать окно) и «Выход» (полностью закрыть приложение)</li>
+    <li><strong>Тултип</strong> - показывает название и версию приложения</li>
+</ul>
+
+<h3>Индикатор занятости</h3>
+<p>Иконка трея отражает состояние приложения:</p>
+<table>
+    <tr><th>Иконка</th><th>Состояние</th><th>Тултип</th></tr>
+    <tr><td>Зелёная</td><td>Нет активных задач</td><td><code>DNO Tool</code></td></tr>
+    <tr><td>«Занятая»</td><td>Выполняется хотя бы одна команда</td><td><code>DNO Tool - выполнение заданий</code></td></tr>
+</table>
+<p>Переключение происходит автоматически: как только запускается команда, иконка становится «занятой», а когда все команды завершены - возвращается в «онлайн».</p>
+
+<!-- ============ УСТРОЙСТВА ============ -->
+<h2 id="devices-add">Добавление устройств</h2>
+
+<p>DNO Tool предоставляет несколько способов добавления устройств - от ручного ввода до автоматического сканирования сети.</p>
+
+<h3>1. Вручную</h3>
+<ol class="steps">
+    <li>Правый клик по дереву устройств или папке - <strong>Добавить устройство</strong></li>
+    <li>Заполните поля: имя, IP-адрес, связка учётных данных, порт (по умолчанию 22)</li>
+    <li>При необходимости укажите MAC-адрес</li>
+    <li>Нажмите <strong>Сохранить</strong></li>
+</ol>
+<p>Устройство будет добавлено в выбранную папку или в корень дерева.</p>
+
+<h3>2. Диапазон IP-адресов</h3>
+<p>Правый клик по дереву - <strong>Добавить диапазон IP</strong>. Позволяет массово создать устройства для целой подсети.</p>
+<p>Поддерживаемые форматы:</p>
+<table>
+    <tr><th>Формат</th><th>Пример</th><th>Результат</th></tr>
+    <tr><td>CIDR</td><td><code>192.168.1.0/24</code></td><td>254 адреса</td></tr>
+    <tr><td>Короткий диапазон</td><td><code>192.168.1.1-15</code></td><td>15 адресов</td></tr>
+    <tr><td>Полный диапазон</td><td><code>192.168.1.1-192.168.1.254</code></td><td>254 адреса</td></tr>
+    <tr><td>Один IP</td><td><code>192.168.1.100</code></td><td>1 адрес</td></tr>
+</table>
+<p>Диалог позволяет задать префикс имени (по умолчанию <code>host</code>), порт и связку учётных данных. Имя каждого устройства формируется как <code>префикс-N</code> - сквозная нумерация с единицы (например, <code>host-1</code>, <code>host-2</code>, …), что исключает дубликаты имён для подсетей больше /24. Максимально 1024 адреса за один раз.</p>
+
+<h3>3. Drag-and-drop текстового файла (.txt)</h3>
+<p>Перетащите <code>.txt</code> файл из проводника на дерево устройств. Программа прочитает файл и создаст устройства. Форматы строк (определяются автоматически):</p>
+<table>
+    <tr><th>Разделитель</th><th>Формат строки</th><th>Пример</th></tr>
+    <tr><td>Без разделителя</td><td>только IP или hostname</td><td><code>192.168.1.10</code></td></tr>
+    <tr><td>Запятая</td><td>name,host,port,mac</td><td><code>server1,192.168.1.10,22,00:11:22:33:44:55</code></td></tr>
+    <tr><td>Двоеточие</td><td>name:host:port:mac</td><td><code>server1:192.168.1.10:22:00:11:22:33:44:55</code></td></tr>
+    <tr><td>Точка с запятой</td><td>name;host;port;mac</td><td><code>server1;192.168.1.10;22;00-11-22-33-44-55</code></td></tr>
+    <tr><td>Tab</td><td>name&#9;host&#9;port&#9;mac</td><td><code>server1&#9;192.168.1.10&#9;22&#9;00:11:22:33:44:55</code></td></tr>
+    <tr><td>Пробелы</td><td>name host port mac</td><td><code>server1  192.168.1.10  22  00:11:22:33:44:55</code></td></tr>
+</table>
+<p>Поля <code>port</code> и <code>mac</code> необязательны - если их нет, порт берётся из настроек. Учётные данные задаются связками (см. <a href="#settings">Настройки</a>), а не в строке импорта. Строки, начинающиеся с <code>#</code>, пропускаются как комментарии. Устройства добавляются в папку, на которую был сброшен файл.</p>
+
+<h3>4. Drag-and-drop текста</h3>
+<p>Вы можете скопировать текст из любого источника (таблица, терминал, документ) и перетащить его прямо на дерево устройств. Каждая строка разбирается по тем же правилам, что и текстовый файл.</p>
+
+<h3>5. Импорт JSON-файла</h3>
+<p>Через меню <strong>Файл - Хосты - Импортировать список</strong> можно загрузить устройства из JSON-файла. Формат файла аналогичен <code>hosts.json</code>.</p>
+
+<h3>6. IP-сканер</h3>
+<p>Через <strong>Инструменты - Сканер хостов</strong> можно автоматически обнаружить устройства в сети (см. <a href="#ip-scanner">раздел IP-сканер</a>). Найденные устройства добавляются кнопкой <strong>Добавить выбранные</strong>.</p>
+
+<h3>7. Внутренний drag-and-drop</h3>
+<p>Устройства и папки можно перетаскивать мышкой внутри дерева для изменения структуры. Если перетащить устройство на другое устройство, целевое устройство автоматически станет папкой.</p>
+
+<h3>8. Двойной клик</h3>
+<p>Двойной клик по устройству открывает диалог редактирования. Двойной клик по папке - диалог переименования.</p>
+
+<h2 id="devices-manage">Управление устройствами</h2>
+
+<h3>Дерево устройств</h3>
+<p>Устройства отображаются в виде иерархического дерева слева. Вы можете:</p>
+<ul>
+    <li><strong>Создавать папки</strong> - через контекстное меню (правый клик)</li>
+    <li><strong>Перетаскивать</strong> устройства между папками внутри дерева</li>
+    <li><strong>Контекстное меню</strong> - правый клик: добавить, редактировать, удалить, пинг</li>
+    <li><strong>Отмечать галочками</strong> устройства для добавления в список выполнения</li>
+</ul>
+
+<h3>Список выполнения</h3>
+<p>Устройства, отмеченные галочкой в дереве, появляются в списке справа. Именно этот список используется при выполнении команд. Можно отметить несколько устройств для массового выполнения.</p>
+
+<h3>Группы устройств</h3>
+<p>В режиме «Список» и «Иконки» устройства отображаются по группам - по папкам из дерева или по сетевым подсетям. Заголовок каждой группы интерактивен:</p>
+<ul>
+    <li><strong>Клик по заголовку</strong> сворачивает или разворачивает содержимое группы. Рядом с названием показывается уголок-индикатор: <code>▾</code> - развёрнуто, <code>▸</code> - свёрнуто</li>
+    <li><strong>Счётчик «онлайн/всего»</strong> - бейдж рядом с названием группы (например <code>3/5</code>). Обновляется в реальном времени при изменении статуса устройств, при добавлении и удалении</li>
+    <li><strong>Авто-сворачивание пустых групп</strong> - при включённом фильтре «только онлайн» группы без доступных устройств сворачиваются автоматически. Когда в свёрнутой группе появляется онлайн-хост, она разворачивается обратно. Ручные сворачивания пользователя при этом не сбрасываются</li>
+</ul>
+<p>Секции списка прижаты кверху, а свободное место уходит вниз - так все группы собраны вместе и не растягиваются по всему окну.</p>
+
+<h3>Поля устройства</h3>
+<table>
+    <tr><th>Поле</th><th>Описание</th><th>Обязательно</th></tr>
+    <tr><td>Имя</td><td>Отображаемое название</td><td>Да</td></tr>
+    <tr><td>IP / Хост</td><td>IP-адрес или доменное имя</td><td>Да</td></tr>
+    <tr><td>Связка учётных данных</td><td>Логин и пароль для SSH-подключения (именованная связка; если не выбрана - глобальная связка по умолчанию)</td><td>Нет</td></tr>
+    <tr><td>Порт</td><td>SSH-порт (по умолчанию 22)</td><td>Нет</td></tr>
+    <tr><td>MAC-адрес</td><td>Физический адрес устройства</td><td>Нет</td></tr>
+    <tr><td>Использовать sudo</td><td>Режим sudo: «По умолчанию» (наследовать настройку SSH), «Да» или «Нет»</td><td>Нет</td></tr>
+    <tr><td>Локаль</td><td>Локаль SSH-команд: «По умолчанию» (наследовать настройку SSH), «(отключить)» или явное значение из списка / своё</td><td>Нет</td></tr>
+</table>
+
+<h2 id="sftp-commander">Файловый командер</h2>
+<p>Двухпанельный файловый командер для обмена файлами между вашим компьютером и удалённым сервером. Открывается командой <strong>Обмен файлами</strong> в контекстном меню устройства.</p>
+
+<h3>Интерфейс</h3>
+<ul>
+    <li><strong>Левая панель</strong> — локальная файловая система, <strong>правая</strong> — удалённый сервер. Каждая панель имеет собственный тулбар и адресную строку с навигацией по сегментам пути</li>
+    <li><strong>Тулбар панели</strong>: домой, назад, вперёд, вверх, обновить, создать папку, создать файл, скачать/загрузить, удалить, переименовать, копировать путь</li>
+    <li><strong>Адресная строка</strong> показывает путь в виде хлебных крошек — клик по сегменту переходит в соответствующую папку. Кнопка ✏ переключает в режим ручного ввода пути</li>
+    <li><strong>Диск-селектор</strong> (Windows, локальная панель) — переключение между дисками в одной строке с адресом</li>
+    <li><strong>Статус-бар</strong> внизу показывает ход операций с прогресс-баром и кнопкой отмены. При перетаскивании файлов виден живой прогресс: текущий файл, проценты, размеры и скорость, а идущая операция помечена бейджем на окне</li>
+</ul>
+
+<h3>Перетаскивание файлов</h3>
+<ul>
+    <li><strong>Между панелями</strong> — перетащите файлы из одной панели в другую для загрузки или скачивания</li>
+    <li><strong>Внутри панели</strong> — перетащите файлы в папку для перемещения</li>
+    <li><strong>Из Windows Explorer</strong> — перетащите файлы из проводника в локальную панель для импорта или в удалённую для загрузки на сервер</li>
+</ul>
+
+<h3>Контекстное меню</h3>
+<p>Правый клик по файлу или папке открывает меню с действиями:</p>
+<ul>
+    <li><strong>Открыть</strong> — предпросмотр файла (на удалённом сервере)</li>
+    <li><strong>Упаковать в tar.gz</strong> — создать архив в текущей папке</li>
+    <li><strong>Распаковать</strong> — распаковать архив (tar, zip, 7z, rar) в текущую папку. На удалённом сервере распаковка выполняется напрямую через SSH</li>
+    <li><strong>Переименовать</strong>, <strong>Удалить</strong></li>
+    <li><strong>Копировать имя</strong>, <strong>Копировать путь</strong></li>
+    <li><strong>Свойства</strong> — информация о файле, редактирование прав доступа</li>
+</ul>
+<p>Правый клик по пустому месту — создать папку, создать файл, обновить, копировать путь текущей папки.</p>
+
+<h3>Горячие клавиши</h3>
+<table>
+    <tr><th>Клавиша</th><th>Действие</th></tr>
+    <tr><td><kbd>F2</kbd></td><td>Переименовать</td></tr>
+    <tr><td><kbd>F3</kbd></td><td>Свойства файла</td></tr>
+    <tr><td><kbd>F5</kbd></td><td>Передать файлы в другую панель</td></tr>
+    <tr><td><kbd>F7</kbd></td><td>Создать папку</td></tr>
+    <tr><td><kbd>F8</kbd> / <kbd>Del</kbd></td><td>Удалить</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Обновить активную панель</td></tr>
+    <tr><td><kbd>Alt</kbd>+<kbd>↑</kbd></td><td>Вверх на уровень</td></tr>
+    <tr><td><kbd>Backspace</kbd></td><td>Вверх на уровень</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd></td><td>Редактировать путь</td></tr>
+    <tr><td><kbd>Tab</kbd></td><td>Переключить активную панель</td></tr>
+</table>
+
+<h3>Архивы</h3>
+<ul>
+    <li><strong>Упаковка</strong> — создаёт <code>.tar.gz</code> архив в текущей папке (локально или на сервере)</li>
+    <li><strong>Распаковка на сервере</strong> — поддерживаются форматы <code>.tar.gz</code>, <code>.tgz</code>, <code>.tar</code>, <code>.tar.bz2</code>, <code>.tar.xz</code>, <code>.zip</code>, <code>.7z</code>, <code>.rar</code>. Распаковка выполняется прямо на сервере; требуются установленные утилиты (<code>unzip</code>, <code>7z</code>, <code>unrar</code>). Запароленные архивы не зависают — показывается сообщение об ошибке</li>
+</ul>
+
+<h2 id="devices-monitor">Мониторинг доступности</h2>
+
+<p>Программа автоматически проверяет доступность отмеченных устройств. Когда вы ставите галочку рядом с устройством, программа начинает периодически проверять, доступен ли этот хост.</p>
+
+<h3>Как работает проверка</h3>
+<p>Проверка выполняется путём TCP-соединения к SSH-порту устройства (по умолчанию 22). Это <strong>не ICMP-ping</strong> - программа проверяет, работает ли SSH-сервис на хосте.</p>
+<ul>
+    <li>Интервал проверки - настраивается (по умолчанию 30 секунд, с разбросом +/-10% для равномерности нагрузки)</li>
+    <li>Таймаут соединения - настраивается (по умолчанию 2 секунды)</li>
+    <li>Порт проверки - совпадает с SSH-портом устройства (можно указать другие порты в настройках)</li>
+</ul>
+
+<p>Результат отображается иконкой рядом с устройством:</p>
+<ul>
+    <li><strong>Зелёная иконка</strong> - порт открыт, устройство доступно</li>
+    <li><strong>Красная иконка</strong> - порт закрыт или хост недоступен</li>
+</ul>
+
+<p>Проверка запускается автоматически при установке галочки и останавливается при снятии. Также проверка останавливается при удалении устройства или закрытии программы.</p>
+
+<div class="info-box">
+    Для детальной диагностики сети с ICMP-ping и графиком задержки в реальном времени используйте <a href="#pinger">Пингер</a>.
+</div>
+
+<h3>Настройка портов проверки</h3>
+<p>В настройках приложения можно указать порты для проверки доступности. По умолчанию проверяется только порт 22 (SSH). Можно добавить порты 80, 443, 3389 и другие.</p>
+
+<h2 id="recording">Запись экрана</h2>
+
+<p>DNO Tool позволяет удалённо записывать экран или камеру устройств через два движка:</p>
+
+<div class="card-grid">
+    <div class="card">
+        <h4>FFmpeg</h4>
+        <ul>
+            <li>Захват экрана (x11grab, gdigrab), камеры (v4l2, avfoundation)</li>
+            <li>Протоколы: TCP, UDP, HTTP, RTSP</li>
+            <li>Автоматический перезапуск при обрыве</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>GStreamer</h4>
+        <ul>
+            <li>Захват экрана (ximagesrc), камеры (v4l2)</li>
+            <li>RTSP-сервер или TCP-поток</li>
+            <li>Кодеки: x264, x265, MPEG2, MPEG4</li>
+            <li>Автоустановка GStreamer-пакетов</li>
+        </ul>
+    </div>
+</div>
+
+<p>Для записи выберите устройство, правый клик - <strong>Удалённая запись</strong>. Укажите параметры захвата, кодек и транспорт, затем нажмите «Старт».</p>
+
+<div class="info-box">
+    Видеоредактор использует встроенный медиадвижок. При ошибке откройте <strong>Помощь → Инструменты → FFmpeg</strong> и проверьте результаты диагностики.
+</div>
+
+<!-- ============ КОМАНДЫ ============ -->
+<h2 id="commands-exec">Работа с командами</h2>
+
+<h3>Выбор и выполнение команды</h3>
+<p>Команды организованы в иерархические категории. Отметьте устройства галочками в дереве, выберите команду из выпадающего списка и нажмите <strong>Выполнить</strong>.</p>
+
+<ol class="steps">
+    <li>Отметьте одно или несколько устройств галочками в дереве</li>
+    <li>В выпадающем списке задач разверните нужную категорию и выберите команду</li>
+    <li>Если команда требует параметров - появится диалог ввода значений</li>
+    <li>Нажмите <strong>Выполнить</strong></li>
+    <li>Результаты появятся в таблице внизу окна</li>
+</ol>
+
+<div class="info-box">
+    Команды выполняются <strong>параллельно</strong> на всех выбранных устройствах. Выполнение можно отменить в любой момент кнопкой <strong>Отмена</strong>.
+</div>
+
+<p>Выпадающий список задач отображает команды в виде дерева: <strong>Категория - Подкатегория - Команда</strong>. Категории показаны значком папки, команды - значком терминала. При наведении на команду появляется подсказка с описанием и параметрами.</p>
+
+<p>Если команда содержит параметры (<code>%param1%</code>, <code>%param2%</code>), при нажатии «Выполнить» откроется диалог ввода - для каждого параметра отображается название и текстовое поле. Окно подгоняется под содержимое, клавиша Enter подтверждает ввод.</p>
+
+<h3>Типы команд</h3>
+<table>
+    <tr><th>Тип</th><th>Описание</th><th>Пример</th></tr>
+    <tr><td><span class="badge badge-ssh">SSH</span></td><td>Выполняется на удалённом сервере</td><td><code>dnf update -y</code></td></tr>
+    <tr><td><span class="badge badge-sftp">SFTP</span></td><td>Передача файлов</td><td>Загрузка RPM-пакета на сервер</td></tr>
+    <tr><td><span class="badge badge-local">LOCAL</span></td><td>Выполняется на локальной машине</td><td><code>ping 192.168.1.1</code></td></tr>
+</table>
+
+<p>Команды могут быть <strong>многошаговыми</strong>: сначала SFTP-загрузка файла, затем SSH-установка. Шаги выполняются последовательно на каждом устройстве.</p>
+
+<h3>Автоматические подстановки</h3>
+<p>В тексте команды можно использовать плейсхолдеры - они автоматически заменятся данными выбранного устройства:</p>
+<table>
+    <tr><th>Плейсхолдер</th><th>Что подставится</th></tr>
+    <tr><td><code>%login%</code> / <code>%user%</code> / <code>%username%</code></td><td>SSH-логин устройства (из связки учётных данных)</td></tr>
+    <tr><td><code>%hostname%</code> / <code>%host%</code> / <code>%ip%</code></td><td>IP-адрес или hostname</td></tr>
+    <tr><td><code>%port%</code></td><td>SSH-порт</td></tr>
+    <tr><td><code>%password%</code> / <code>%pass%</code></td><td>Пароль устройства (из связки учётных данных)</td></tr>
+    <tr><td><code>%mac%</code></td><td>MAC-адрес</td></tr>
+    <tr><td><code>%date%</code></td><td>Текущая дата (ГГГГ-ММ-ДД)</td></tr>
+    <tr><td><code>%time%</code></td><td>Текущее время (ЧЧ-ММ-СС)</td></tr>
+    <tr><td><code>%sudo%</code></td><td><code>sudo </code> если для устройства включено sudo, иначе пусто - для точечной вставки повышения прав в середину команды</td></tr>
+</table>
+
+<h3>Результаты выполнения</h3>
+<p>Результаты отображаются в таблице: <strong>Устройство</strong>, <strong>Предпросмотр</strong>, <strong>Статус</strong>. В ячейке предпросмотра видны первые 200 символов вывода, при наведении на строку всплывает подсказка с первыми 10 и последними 10 строками и числом пропущенных строк.</p>
+<table>
+    <tr><th>Статус</th><th>Описание</th></tr>
+    <tr><td>Ожидание</td><td>Команда в очереди, ещё не запущена</td></tr>
+    <tr><td>Выполнение</td><td>Команда выполняется на устройстве</td></tr>
+    <tr><td>Ожидание ввода</td><td>Команда ждёт ввода от пользователя (пароль, подтверждение <code>y/n</code> и т.п.)</td></tr>
+    <tr><td>Успех</td><td>Команда завершилась успешно</td></tr>
+    <tr><td>Неудача</td><td>Ошибка при выполнении команды</td></tr>
+    <tr><td>Отменено</td><td>Выполнение отменено пользователем</td></tr>
+    <tr><td>Потеря связи</td><td>Соединение с устройством разорвано</td></tr>
+</table>
+
+<p>При двойном клике на строке результата открывается окно вывода. Очень большой вывод сокращается для отображения; для дальнейшей работы сохраните результат в файл. Если команда ещё выполняется - вывод обновляется в реальном времени.</p>
+
+<p>Статус «Ожидание ввода» (с жёлтой иконкой) появляется, когда программа обнаруживает в выводе команды приглашение для ввода - запросы пароля (<code>Password:</code>, <code>Пароль:</code>, <code>Enter password:</code>, <code>Введите пароль:</code>, <code>password for user:</code>, <code>пароль для user:</code>, <code>passphrase for key '...':</code>, <code>PIN:</code>, <code>пин-код:</code>), коды подтверждения и одноразовые пароли (<code>verification code:</code>, <code>auth code:</code>, <code>token:</code>, <code>код подтверждения:</code>, <code>код:</code>), подтверждения (<code>y/n</code>, <code>yes/no</code>, <code>Д/н</code>, <code>да/нет</code>, <code>Continue?</code>, <code>Proceed?</code>, <code>Are you sure?</code>, <code>Do you want ...?</code>, <code>OK?</code>, <code>Продолжить?</code>, <code>Вы уверены?</code>, <code>Хотите продолжить?</code>), запросы подключения по ключу SSH (<code>Are you sure you want to continue connecting?</code>, <code>key fingerprint</code>, <code>продолжить подключение?</code>, <code>отпечаток ключа</code>) и приглашения нажать клавишу (<code>Press Enter</code>, <code>Нажмите Enter</code>, <code>Press any key</code>, <code>Hit enter</code>, <code>Нажмите любую клавишу</code>, <code>Нажмите ввод</code>). Как только команда продолжает выполняться (появляется новый вывод), статус автоматически возвращается на «Выполнение». Если включена автоматическая подача пароля sudo, статус «Ожидание ввода» появится лишь на доли секунды и не требует действий.</p>
+
+<h3>Интерактивный ввод во время выполнения</h3>
+<p>Если команда ждёт ввода (пароль, подтверждение, текст), окно результата предоставляет поле ввода и кнопку <strong>Отправить</strong>. Введите текст и нажмите Enter или кнопку - текст будет отправлен в активную SSH-сессию выбранного устройства. Отправленный ввод отображается в области вывода с пометкой <code>[stdin]</code>.</p>
+<p>Для приглашений вида «Press Enter» / «Нажмите Enter» достаточно нажать Enter в пустом поле - будет отправлен перевод строки. Пустой ввод отображается как <code>[stdin] ⏎</code>.</p>
+
+<div class="info-box">
+    Поле ввода работает только для SSH-команд и доступно, пока команда выполняется. После завершения команды (статус «Успех»/«Неудача»/«Отменено»/«Потеря связи») поле и кнопка скрываются. При открытии окна для уже завершённой команды поле ввода также скрыто.
+</div>
+
+<p>Правый клик по таблице результатов:</p>
+<ul>
+    <li><strong>Сохранить текущий результат</strong> - сохранить вывод выбранного устройства в файл</li>
+    <li><strong>Сохранить все результаты</strong> - экспортировать все результаты в табличный файл</li>
+    <li><strong>Очистить все</strong> - удалить все строки из таблицы</li>
+</ul>
+
+<h2 id="sftp">Передача файлов (SFTP)</h2>
+<p>Команды типа SFTP позволяют передавать файлы между вашим компьютером и удалённым сервером. Формат: <code>источник::назначение</code></p>
+
+<pre><code>./packages/app.rpm::root@192.168.1.10:/tmp/app.rpm</code></pre>
+<p>С подстановками:</p>
+<pre><code>./packages/%param1%.rpm::%login%@%hostname%:/tmp/%param1%.rpm</code></pre>
+<p>Скачивание с сервера:</p>
+<pre><code>%login%@%hostname%:/var/log/messages::./logs/</code></pre>
+
+<!-- ============ ИНСТРУМЕНТЫ ============ -->
+<!-- ============ МАСТЕР НАСТРОЙКИ ============ -->
+<h2 id="setup-wizard">Мастер настройки</h2>
+
+<p>Пошаговый мастер первоначальной настройки, доступный в меню <strong>Помощь → Инструменты → Мастер настройки</strong>. Запускается автоматически при первом старте, если нет ни списка устройств, ни списка команд. Мастер проводит через все этапы - от выбора режима до настройки Veyon - и сохраняет результат по нажатию «Готово».</p>
+
+<div class="info-box">
+    Перемещаться между шагами можно кликом по названию в левой панели мастера.
+</div>
+
+<h3>Выбор режима</h3>
+<p>Первый шаг - выбор режима работы мастера:</p>
+<table>
+    <tr><th>Режим</th><th>Описание</th></tr>
+    <tr><td><strong>Чистая установка</strong></td><td>Начать с пустого списка устройств и команд. Все поля будут пустыми.</td></tr>
+    <tr><td><strong>Подхватить текущие настройки</strong></td><td>Загрузить уже существующие устройства и команды из <code>~/.dno-tool/</code>, чтобы отредактировать или дополнить их. Под списком режимов отображается сводка: сколько хостов и команд найдено.</td></tr>
+</table>
+<p>При переключении с «подхвата» обратно на «чистую установку» загруженные данные очищаются - мастер возвращается к пустым спискам.</p>
+
+<h3>Хосты</h3>
+<p>Шаг для добавления и редактирования устройств. Дерево устройств в мастере показывает основные сведения:</p>
+<table>
+    <tr><th>Колонка</th><th>Назначение</th></tr>
+    <tr><td>Имя</td><td>Название устройства - отображается в дереве и списке выполнения</td></tr>
+    <tr><td>Адрес</td><td>IP-адрес или hostname для SSH-подключения</td></tr>
+    <tr><td>Связка</td><td>Связка учётных данных (логин/пароль) для SSH-подключения</td></tr>
+    <tr><td>MAC</td><td>MAC-адрес устройства — используется для Wake-on-LAN</td></tr>
+</table>
+<p>Доступные действия на этом шаге:</p>
+<ul>
+    <li><strong>Добавить устройство</strong> - создать новое устройство в выбранной папке или в корне</li>
+    <li><strong>Добавить диапазон IP</strong> - массово создать устройства для подсети или диапазона адресов (см. <a href="#devices-add">Добавление устройств</a>)</li>
+    <li><strong>Очистить</strong> - удалить все устройства из дерева мастера</li>
+    <li><strong>Drag-and-drop</strong> - перетаскивать устройства между папками, бросать <code>.txt</code>-файлы и текст из буфера обмена для импорта</li>
+    <li><strong>Двойной клик</strong> - редактировать значение в любой колонке прямо в дереве</li>
+</ul>
+<p>Учётные данные задаются <strong>связками учётных данных</strong> (именованные пары логин/пароль). Связка, выбранная в мастере, сохраняется как связка по умолчанию для SSH-подключений.</p>
+
+<h3>Команды</h3>
+<p>Шаг для наполнения библиотеки команд - задач и скриптов, которые будут выполняться на устройствах:</p>
+<ul>
+    <li><strong>Загрузить с сервера</strong> - скачать актуальную библиотеку команд из репозитория проекта (нужен интернет)</li>
+    <li><strong>Импортировать из файла</strong> - загрузить свой <code>commands.json</code> с диска</li>
+    <li><strong>Просмотр</strong> - дерево загруженных команд с именем и описанием каждой задачи</li>
+</ul>
+<p>Подробнее см. <a href="#commands-editor">Редактор команд</a>.</p>
+
+<h3>Локальная машина: SSH-ключи</h3>
+<p>Шаг для подготовки локальных SSH-ключей оператора. На этом шаге ключи <strong>только создаются</strong> на вашей машине; их установка на устройства выполняется позже - на шаге <a href="#wizard-remote">«Удалённые → Установка»</a>. Доступные операции:</p>
+<ul>
+    <li><strong>Создать пару</strong> - создать новую пару ключей (Ed25519, RSA или ECDSA) в <code>~/.ssh</code></li>
+    <li><strong>Удалить / Экспорт / Импорт / Извлечь public</strong> - управление существующими ключами в каталоге <code>~/.ssh</code></li>
+    <li><strong>Просмотр known_hosts</strong> - просмотр известных хостов</li>
+</ul>
+<p>Ключ, используемый программой для подключений по умолчанию, отмечен отдельно. Подробное описание операций - в разделе <a href="#ssh-keys">Управление SSH-ключами</a>.</p>
+
+<h3>Локальная машина: Veyon</h3>
+<p>Шаг для настройки интеграции с Veyon - мониторинга экранов устройств. На этом шаге выполняется локальная установка Veyon, создание пары ключей и настройка WebAPI; публичный ключ будет развёрнут на хостах позже - на шаге <a href="#wizard-remote">«Удалённые → Установка»</a>. Вкладки шага:</p>
+<table>
+    <tr><th>Вкладка</th><th>Назначение</th></tr>
+    <tr><td>Установка</td><td>Проверка установки Veyon, установка/переустановка компонент</td></tr>
+    <tr><td>Ключи</td><td>Создание и выбор ключа аутентификации</td></tr>
+    <tr><td>WebAPI</td><td>Настройка подключения к Veyon Web API</td></tr>
+    <tr><td>Диагностика</td><td>Проверка доступности сервисов Veyon, журналы ошибок</td></tr>
+    <tr><td>Миниатюры</td><td>Параметры живых миниатюр: качество, размер, формат, стиль</td></tr>
+</table>
+<p>Подробнее см. <a href="#veyon">Veyon: мониторинг и доступ</a>.</p>
+
+<h3>Локальная машина: VNC-параметры</h3>
+<p>Шаг для задания общих параметров VNC-сервера (kmsvnc, x11vnc или KRFB), которые применяются при установке на хосты (на шаге <a href="#wizard-remote">«Удалённые → Установка»</a>). Параметры:</p>
+<table>
+    <tr><th>Параметр</th><th>По умолчанию</th><th>Назначение</th></tr>
+    <tr><td>Порт по умолчанию</td><td><code>5900</code></td><td>VNC-порт (для выбранного сервера); может быть переопределён для конкретного устройства в <code>hosts.json</code></td></tr>
+    <tr><td>VNC-пароль</td><td><em>пусто</em></td><td>Пароль VNC (для установки задайте пароль). Кнопка «Сгенерировать» создаёт случайный 12-символьный пароль. При установке krfb пароль также применяется к вашей машине</td></tr>
+    <tr><td>Кодек по умолчанию</td><td><code>Авто</code></td><td>Кодек для VNC-сессии: Авто / Tight (JPEG) / Zlib / Raw</td></tr>
+    <tr><td>Разрешить изменение размера сессии</td><td>включено</td><td>Изменение размера рабочего стола под окно клиента (полноценно поддерживается только в VNC-режиме)</td></tr>
+</table>
+<p>Подробнее - в разделе <a href="#vnc-settings">Настройки VNC</a>.</p>
+
+<h3 id="wizard-remote">Удалённые: Установка</h3>
+<p>Шаг потоковой установки выбранных сервисов (SSH, Veyon, VNC) на удалённые хосты через SSH. Ключи (SSH и Veyon) готовятся на локальных шагах и только деплоятся на хосты - повторно генерировать их здесь не нужно.</p>
+
+<p>Интерфейс шага состоит из трёх частей:</p>
+<ul>
+    <li><strong>Слева - дерево хостов</strong> с галочками. Отметьте устройства, на которые нужно установить сервисы. Под деревом - метка с перечнем сервисов, выбранных на шаге «Выбор режима».</li>
+    <li><strong>Справа - таблица статусов</strong> «Хост × Сервисы». Колонки формируются динамически из выбранных сервисов (SSH / Veyon / VNC). Каждая ячейка отображает иконку статуса:</li>
+</ul>
+<table>
+    <tr><th>Иконка</th><th>Статус</th></tr>
+    <tr><td>⏳</td><td>Ожидание - хост в очереди, установка ещё не началась</td></tr>
+    <tr><td>✅</td><td>Успех - сервис установлен и настроен</td></tr>
+    <tr><td>❌</td><td>Ошибка - подробности в детальном логе хоста</td></tr>
+    <tr><td>⏭</td><td>Пропуск - сервис не выбран или уже установлен</td></tr>
+    <tr><td>⏹</td><td>Остановлено - установка прервана пользователем</td></tr>
+</table>
+<ul>
+    <li><strong>Снизу - общий лог</strong> с краткими сообщениями о ходе установки (по одной строке на событие).</li>
+</ul>
+
+<p>Кнопки управления:</p>
+<ul>
+    <li><strong>Установить</strong> - запустить потоковую установку на отмеченных хостах. Перед запуском мастер проверяет готовность ключей (SSH и Veyon) - если ключ не подготовлен, запуск блокируется с подсказкой вернуться на соответствующий локальный шаг.</li>
+    <li><strong>Прервать</strong> - остановить установку. Текущие операции на хостах завершаются корректно, оставшиеся хосты помечаются как остановленные.</li>
+</ul>
+
+<p>Двойной клик по строке таблицы открывает модальное окно с детальным логом по конкретному хосту - там фиксируются все команды, вывод и ошибки для каждого сервиса отдельно.</p>
+
+<p>Состав операций по каждому сервису (выполняются последовательно на каждом хосте в рамках одного SSH-соединения):</p>
+<table>
+    <tr><th>Сервис</th><th>Что выполняется на хосте</th></tr>
+    <tr><td><strong>SSH</strong></td><td>SFTP-деплой публичного ключа в <code>authorized_keys</code> для беспарольной авторизации</td></tr>
+    <tr><td><strong>Veyon</strong></td><td>Импорт публичного ключа через <code>veyon-cli authkeys import</code>, установка метода аутентификации (key-file), регистрация и перезапуск Veyon Service, открытие портов firewall</td></tr>
+    <tr><td><strong>VNC</strong></td><td>Установка и настройка выбранного сервера: kmsvnc, x11vnc или KRFB. Мастер задаёт пароль, настраивает запуск и проверяет подключение.</td></tr>
+</table>
+
+<div class="info-box">
+    Установка выполняется параллельно - количество потоков берётся из настроек сети приложения. Для каждого хоста открывается одно SSH-соединение, внутри которого сервисы устанавливаются последовательно. Требует root-доступа на хостах (прямой вход под root или обычный пользователь с sudo - см. <a href="#settings">настройки SSH</a>).
+</div>
+
+<h3>Как выбрать VNC-сервер</h3>
+<table>
+<tr><th>Вариант</th><th>Когда использовать</th></tr>
+<tr><td>kmsvnc (по умолчанию)</td><td>Для поддерживаемых видеокарт, в том числе в сеансе Wayland. Пакет входит в поставку для МОС 12/13. NVIDIA не поддерживается; совместимость компьютера проверяет мастер.</td></tr>
+<tr><td>x11vnc</td><td>Для сеанса X11. В Wayland мастер откажет в установке.</td></tr>
+<tr><td>KRFB</td><td>Общий экран KDE в пользовательском сеансе; вариант для Wayland, в том числе с NVIDIA.</td></tr>
+</table>
+<p>Мастер устанавливает именно выбранный вариант. Если компьютер не подходит, откройте подробный журнал его строки и выберите другой сервер самостоятельно. Для kmsvnc учитываются первые восемь символов пароля.</p>
+<p>Смена VNC-сервера прерывает текущие подключения к экрану. После успешной проверки прежний сервер, установленный мастером, удаляется или отключается. При ошибке мастер пытается восстановить прежний доступ; результат восстановления смотрите в журнале. Если порт занят вручную запущенной программой, мастер сообщит об этом — сначала завершите её на удалённом компьютере.</p>
+<p>Кнопка «Готово» сохраняет списки и настройки. Уже выполненные действия на удалённых компьютерах происходят во время установки, а не при нажатии «Готово».</p>
+<h3>Сводка и завершение</h3>
+<p>Последний шаг - сводка введённых данных перед сохранением:</p>
+<ul>
+    <li>Выбранный режим (чистая установка / подхват)</li>
+    <li>Количество добавленных устройств</li>
+    <li>Количество загруженных команд</li>
+    <li>Статус SSH-ключей (сгенерирован / пропущен)</li>
+    <li>Статус настройки Veyon</li>
+    <li>Статус VNC-параметров</li>
+    <li>Статус удалённой установки сервисов</li>
+</ul>
+<p>Нажмите <strong>Готово</strong>, чтобы сохранить все данные. Мастер запишет устройства в <code>hosts.json</code>, команды - в <code>commands.json</code>, а настройки SSH, Veyon и VNC - в <code>settings.json</code>. После завершения главное окно приложения автоматически перезагрузит данные.</p>
+
+<h2 id="ip-scanner">IP-сканер</h2>
+<p>Инструмент для поиска устройств в сети. Открывается через <strong>Инструменты - Сканер хостов</strong>.</p>
+
+<h3>Как пользоваться</h3>
+<ol class="steps">
+    <li>Укажите сеть или диапазон адресов. Поддерживаются форматы:
+        <ul>
+            <li>CIDR: <code>192.168.1.0/24</code></li>
+            <li>Полный диапазон: <code>192.168.1.1-192.168.1.254</code></li>
+            <li>Короткий диапазон: <code>192.168.1.1-15</code></li>
+            <li>Одиночный IP: <code>192.168.1.100</code></li>
+        </ul>
+    </li>
+    <li>Выберите режим сканирования: ICMP-ping или проверка портов</li>
+    <li>При проверке портов - настройте список портов</li>
+    <li>При необходимости включите определение MAC-адресов и фильтр «только доступные»</li>
+    <li>Ползунком «Потоки» задайте количество параллельных потоков сканирования (1–128, степень двойки). Значение сохраняется между запусками, по умолчанию 32</li>
+    <li>Нажмите <strong>Сканировать</strong></li>
+    <li>Отметьте нужные устройства и нажмите <strong>Добавить выбранные хосты</strong></li>
+</ol>
+
+<p>Результаты группируются по подсетям и показывают IP-адрес, открытые порты, MAC-адрес и статус доступности. В строке состояния отображается прогресс сканирования: сколько адресов проверено и сколько активных хостов найдено. Правым кликом по таблице можно отметить сразу все устройства одного типа — меню показывает найденные типы с количеством.</p>
+
+<h2 id="pinger">Пингер</h2>
+
+<p>Инструмент для детальной диагностики сети через ICMP-ping с графиком задержки в реальном времени. Открывается через меню <strong>Инструменты - Пингер</strong>. В отличие от автоматического мониторинга доступности (см. <a href="#devices-monitor">Мониторинг доступности</a>), пингер выполняет настоящий ICMP-ping и показывает динамику задержки по времени. Можно следить за несколькими хостами сразу - каждый рисуется своей линией.</p>
+
+<h3>Как пользоваться</h3>
+<ol class="steps">
+    <li>Введите IP-адрес или hostname в поле и нажмите <strong>Добавить</strong> (или отметьте хосты галочками в списке)</li>
+    <li>Нажмите <strong>Старт</strong> - опрос идёт раз в секунду по каждому отмеченному хосту</li>
+    <li>Кнопка <strong>Пауза</strong> замораживает опрос с сохранением графиков, <strong>Продолжить</strong> дописывает в ту же сессию</li>
+</ol>
+
+<p>Цвет линии на графике зависит от задержки:</p>
+<ul>
+    <li><strong>Зелёный</strong> - до 50 мс</li>
+    <li><strong>Жёлтый</strong> - 51-200 мс</li>
+    <li><strong>Красный</strong> - более 200 мс</li>
+</ul>
+<p>Каждый хост получает свой цвет линии (можно закрепить через «Поменять цвет» в контекстном меню - цвет сохраняется между запусками). Время на оси подписано человекочитаемо: секунды, потом мм:сс, потом чч:мм:сс. Хранится вся сессия, вид следует за последними пятью минутами.</p>
+
+<h3>Управление списком</h3>
+<ul>
+    <li><strong>Горячее добавление и удаление</strong> - хосты добавляются и удаляются прямо во время опроса, остальные графики не прерываются</li>
+    <li><strong>Контекстное меню списка</strong> - «Поменять цвет», «Отметить все», «Снять отметки», «Удалить», «Очистить графики»</li>
+    <li><strong>Удаление клавишей Delete</strong> - убрать выбранный хост из списка</li>
+</ul>
+
+<h2 id="topology">Карта сети</h2>
+<p>Откройте <strong>Инструменты → Карта сети</strong>, задайте сеть или диапазон и запустите поиск. Карта помогает увидеть найденные устройства и маршруты до них. При отмене уже найденные результаты остаются на экране.</p>
+<ul><li><strong>Быстрый режим</strong> проверяет несколько представителей подсети и предполагает общую часть маршрута для остальных.</li><li><strong>Точные маршруты</strong> проверяет путь до каждого найденного адреса и занимает больше времени.</li><li><strong>Проверить маршрут</strong> уточняет путь до выбранного устройства.</li><li>В свойствах узла можно задать своё название; досканирование сохраняет ручное расположение узлов.</li></ul>
+<p>Сплошная линия обозначает наблюдаемый переход, пунктир — неизвестный участок или предположение, точки — принадлежность подсети. Карта показывает сетевые маршруты, а не схему физических кабелей. Если устройство не отвечает на проверку, это ещё не доказывает, что оно выключено: ответы могут быть запрещены настройками сети.</p>
+
+<h2 id="video-editor">Видеоредактор</h2>
+<p>Для первого монтажа начните с инструкции «Как пользоваться» ниже: добавьте запись, обрежьте ненужное, сохраните проект и экспортируйте видео.</p>
+<p>Редактор открывается отдельным немодальным окном. Кнопка экспорта находится справа вверху; сохранение проекта доступно в меню <strong>Проект</strong> и по Ctrl+S. В центре два независимых просмотра: исходник из медиапанели и результат таймлайна. Три кнопки-иконки сверху выбирают оба просмотра рядом, только исходник или только монтаж; включена всегда одна. Те же команды доступны в <strong>Вид → Просмотры</strong>. Режим, геометрия и положение разделителей сохраняются отдельно от монтажа.</p>
+<p>Области кадра по умолчанию имеют одинаковые размеры. Под каждым просмотром находятся собственные перемотка и управление воспроизведением; кнопки нарезки и удаления остаются в той же строке под монтажом. Кнопки действий используют иконки, названия показаны в подсказках. Настройки звука слева от таймлайна видны постоянно; сгруппированные команды доступны напрямую без переключателя расширенных инструментов.</p>
+<p>Инструмент для нарезки и склейки записей на таймлайне. Открывается через <strong>Инструменты - Видеоредактор</strong>. Разрез, перемещение, trim, громкость, Mute и изменения текстов поддерживают кнопки отмены/повтора и горячие клавиши <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>. Один жест мышью — один шаг истории; последовательный ввод текста объединяется до паузы 500 мс или перехода к другой операции.</p>
+<p>При фокусе в поле ввода клавиши S/I/O, пробел, Delete и стрелки редактируют поле; Ctrl+Z/Ctrl+Y используют его локальную историю. Команды отмены/повтора монтажа доступны в <strong>Проект → История</strong>.</p>
+<p>В медиапанели доступны поиск по имени/пути, фильтры, естественная сортировка и множественный выбор. <strong>Добавить на таймлайн</strong> выкладывает выбранные файлы в видимом порядке одним шагом Undo; без выбора — все видимые. «Добавить все» пропускает уже использованные файлы. Не завершившие анализ файлы перечисляются в общем статусе; повторите действие после анализа. Удаление из проекта не удаляет файлы с диска.</p>
+<p>Выберите импортированный файл для просмотра в окне <strong>Исходник</strong>; двойной щелчок также открывает этот просмотр, если он скрыт. Его курсор и In/Out независимы от таймлайна, монтажные подписи в исходнике не показываются. Выберите вход/выход и нажмите иконку <strong>Добавить фрагмент In/Out на таймлайн</strong>. Точные границы и выбор потоков раскрываются иконкой шестерёнки. Выбор потоков действует на все фрагменты этого файла; более короткий видеопоток не заменяет уже используемый материал без правки границ. Запуск одного просмотра ставит другой на паузу. Перед экспортом сводка показывает контейнер, кодеки, длительность, размер и FPS; объём оценивается только при известном битрейте, с явной оговоркой о накладных расходах контейнера.</p>
+<p>Поле таймкода принимает секунды, <code>ЧЧ:ММ:СС.мс</code> или <code>ЧЧ:ММ:СС:кадры</code>. Стрелки вверх/вниз переходят по стыкам; <kbd>Ctrl</kbd>+колесо меняет масштаб у курсора. Привязка учитывает стыки, In/Out и плейхед; <kbd>Alt</kbd> временно отключает её. Шаг соответствует рациональному CFR проекта; для исходного VFR это приближение. История ограничена 100 шагами и 32 МиБ сжатых снимков; старые команды вытесняются.</p>
+<p>Меню <strong>Монтаж → Звук</strong> задаёт нарастание/затухание и коэффициент нормализации. Измерение исходного пика выполняется в фоне и сохраняет коэффициент для уровня −1 dBFS (усиление ограничено ×100); громкость клипа и мастер умножаются на него. Лимитер явно ограничивает пики микса до 0.95 без автоматического подъёма уровня; индикатор показывает декодированный уровень и клиппинг. Кроссфейду двух соседних аудиоклипов нужен запас материала с обеих сторон; другие клипы не сдвигаются.</p>
+<p>Созданный текстовый блок виден на фиолетовой <strong>T-дорожке</strong> над видео даже с пустой строкой или пробелами. Пробелы в начале и конце надписи сохраняются. Дорожка отсутствует, пока текстовые блоки не созданы; очистка содержимого уже созданного блока её не скрывает. Перетаскивайте блок для переноса по времени, левый/правый край — для изменения начала/конца. Выбор блока показывает его настройки справа; <kbd>Delete</kbd> удаляет только текст. Перекрывающиеся надписи размещаются в отдельных строках. Изменения поддерживают Undo/Redo и сохраняются в проекте. При вырезании времени интервалы текста сдвигаются вместе с монтажом.</p>
+<p><strong>Обрезка за края</strong> работает для видео, аудио и текста: наведите мышь на левый или правый край блока, дождитесь горизонтального курсора изменения размера и тяните. У связанной V+A-пары оба блока обрезаются вместе, в том числе при перетаскивании края аудио. После разделения меняется только тот блок, за край которого тянут. У коротких фрагментов также доступны оба края, а середина остаётся для перемещения. Заблокированная дорожка или связанная пара не обрезается.</p>
+<p>Титры также имеют числовые начало/конец (конец 0 — до конца проекта), многострочный ввод и дублирование. Привязанные к клипу титры показываются на таймлайне в абсолютном времени, их границы остаются внутри клипа. Явный TTF/OTF или разрешённый файл выбранного семейства используется общим движком предпросмотра и экспорта; отсутствующий шрифт даёт ошибку. Размер и отступы заданы в пикселях холста.</p>
+<p>Чтобы работать с видео и звуком отдельно, нажмите ПКМ по клипу и выберите <strong>Разделить видео и аудио</strong> или используйте <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd>. Метка V+A исчезнет, части можно перемещать и удалять независимо. Команды <strong>Удалить только звук</strong> и <strong>Удалить только видео</strong> доступны сразу для связанной пары: они сохраняют вторую часть и временные позиции остальных клипов. Эти же действия есть в меню <strong>Монтаж</strong>.</p>
+<p>Экспорт поддерживает профили H.264 с CRF/preset, диапазон In/Out, выбранный клип и пробные 10 секунд от курсора. Для звука доступны WAV (PCM), MP3, AAC и M4A. Большой монтаж готовится частями: до 24 входов одновременно, FFV1 + PCM без промежуточных потерь кодирования; перед началом проверяется консервативная оценка временного диска. Финальное кодирование выполняется один раз.</p>
+<p><strong>Маркеры и фрагменты</strong> хранят именованные точки/интервалы, цвет и заметки; удаление времени сдвигает маркеры вместе с монтажом. <strong>Экспорт серии фрагментов</strong> показывает имена и коллизии до запуска, выполняет файлы последовательно и по умолчанию пропускает существующие. Кнопка отменяет текущий файл; <strong>Проект → Отменить серию</strong> останавливает очередь. Диагностика последней ошибки экспорта доступна в верхнем меню без путей и содержимого подписей.</p>
+<p>В окне камер действие <strong>Готовые записи в видеоредакторе</strong> передаёт завершённые локальные файлы и достоверные подписи/время, оставляя активную запись работать. В удалённой записи действие <strong>Скачать и открыть в редакторе</strong> доступно после остановки: скачанный файл проверяется до публикации и импорта.</p>
+<p>В готовой сборке медиадвижок уже включён. Проверить его работу можно через <strong>Помощь → Инструменты → FFmpeg</strong>: окно показывает доступные форматы, фильтры и результаты пробного кодирования.</p>
+
+<p><strong>Видеослои и преобразования.</strong> Меню «Монтаж → Дорожки» добавляет видеослои и меняет их порядок (снизу вверх), видимость и блокировку. Для аудиодорожек доступны Mute/Solo и ducking по сигналу другой дорожки с порогом, степенью сжатия, атакой и возвратом. Преобразования выбранного видео задают непрозрачность, масштаб, положение долями холста, crop, поворот и появление/исчезновение. Скорость 0.5×/1×/2× применяется вместе со связанным звуком; соседние клипы не сдвигаются. Видеопереход требует запаса материала и создаёт верхний слой; звук сводится отдельным аудиокроссфейдом.</p>
+<p><strong>Титры и раскадровка.</strong> Титр можно привязать к выбранному клипу, отвязать, оформить пресетом или задать безопасные отступы 5%. После команды «Переместить титр в предпросмотре» перетащите его в области кадра: отступы меняются одним шагом Undo. «Маски областей кадра» закрывают нормированный прямоугольник чёрным на заданном интервале. «Раскадровка монтажа» готовит до 16 итоговых кадров на страницу и позволяет перейти к маркеру/стыку. Шаблоны {source}, {timecode}, {recorded_at} вставляют значения выбранного кадра в редактируемую подпись; время записи берётся только из достоверных метаданных камер.</p>
+<p><strong>Proxy</strong> временно отключены. Для Linux VAAPI/QSV в дополнительных параметрах экспорта можно явно указать DRM render-устройство; проверка использует тот же путь, что и кодирование.</p>
+
+<div class="card-grid">
+    <div class="card">
+        <h4>Таймлайн</h4>
+        <ul>
+            <li>Дорожки видео (V) и звука (A)</li>
+            <li>Видеоклип со звуком - связанная пара, режется синхронно</li>
+            <li>Лента кадров на видеоклипах, волна на аудио</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Текст</h4>
+        <ul>
+            <li>Блоки в углах кадра со своим шрифтом и цветом</li>
+            <li>Подложка: цвет, прозрачность, отступы</li>
+            <li>Позиция ползунками X и Y</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Звук</h4>
+        <ul>
+            <li>Громкость и Mute у каждого клипа</li>
+            <li>Звук берётся с A-дорожек; параллельные клипы микшируются</li>
+            <li>Громкость клипа и мастер применяются одинаково в preview и результате</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Экспорт</h4>
+        <ul>
+            <li>MP4/MKV без перекодирования или с ним</li>
+            <li>Живой прогресс со скоростью; оценка остатка времени при выбранном выходном FPS, 100% после проверки результата</li>
+            <li>Кнопка «Отмена» останавливает экспорт</li>
+        </ul>
+    </div>
+</div>
+
+<h3>Как пользоваться</h3>
+<ol class="steps">
+    <li>Импортируйте файлы - они появятся в списке с миниатюрой первого кадра (у аудио - форма волны, у видео со звуком - пометка моно/стерео). Длительность и разрешение подставятся по окончании анализа</li>
+    <li>Выложите нужное на таймлайн через меню списка «Добавить на таймлайн» или «Добавить все на таймлайн» - первый файл сразу покажет кадр в окне просмотра</li>
+    <li>Переместите курсор и нажмите иконку <strong>Разрезать</strong> или <kbd>S</kbd>. Выберите ненужный фрагмент и нажмите иконку <strong>Удалить</strong> или <kbd>Delete</kbd>: связанная V+A-пара удаляется со сдвигом, отдельный блок — с сохранением времени других дорожек. Разрез обрабатывает медиаклипы под курсором на всех дорожках; на границе клип повторно не режется</li>
+    <li>Нажмите иконку <strong>Добавить текст</strong>, введите подпись, выберите угол, размер и оформление. Изменения сразу видны в окне монтажа без повторного кодирования видео. Время показа, точные отступы и многострочный ввод раскрываются шестерёнкой в блоке текста</li>
+    <li>Нажмите <strong>Экспорт</strong> и выберите файл результата. Кнопка «В начало» и клавиша <kbd>Home</kbd> возвращают в начало таймлайна</li>
+</ol>
+
+<p>Меню <strong>Проект</strong> сохраняет монтаж в отдельный файл <code>.dnovideo</code>: исходники, их расположение, границы клипов, звук, связи, тексты и маркеры. <kbd>Ctrl</kbd>+<kbd>S</kbd> сохраняет проект, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> выбирает новое имя; <kbd>Ctrl</kbd>+<kbd>O</kbd> открывает проект, <kbd>Ctrl</kbd>+<kbd>N</kbd> создаёт новый. Звёздочка в заголовке означает несохранённые изменения. Экспорт создаёт готовый медиафайл и не заменяет сохранение проекта.</p>
+<p>После сбоя доступно <strong>Проект → Восстановить после сбоя</strong>. Копии создаются отдельно от основного файла; восстановленный монтаж нужно сохранить. Для перемещённых записей используйте <strong>Заменить исходник</strong> или <strong>Перепривязать папку исходников</strong>: клипы и их идентификаторы сохраняются, слишком короткая или неподходящая запись отклоняется. Недоступные исходники перечисляются перед экспортом.</p>
+
+<p>ПКМ в окне просмотра предлагает <strong>кадр исходника</strong> без обработки и <strong>кадр монтажа с обработкой</strong>: холст, подписи и чёрные промежутки сохраняются как в preview. PNG извлекается в фоне; отмена доступна в том же меню. Ошибка или отмена сохраняют прежний файл.</p>
+<p>Простая нарезка и склейка со связанным звуком воспроизводятся напрямую из исходников, включая чёрные промежутки. Перемотка не запускает промежуточное кодирование. Текст накладывается в окне просмотра и обновляется сразу. Для сложного монтажа со слоями, эффектами, самостоятельным аудиомиксом или изменённым холстом готовится ограниченный диапазон общим движком экспорта; стадия подготовки видна в окне. Изменение только текста не перезапускает эту подготовку.</p>
+<p><strong>Проект → Параметры проекта → Холст и FPS</strong> задаёт размер, рациональный FPS (например, <code>30000/1001</code>) и вписывание с полями либо заполнение с обрезкой. При заданной одной стороне вторая вычисляется по пропорциям.</p>
+<p><kbd>Delete</kbd> удаляет связанный V+A-фрагмент со сдвигом всех дорожек, а отдельный видео-, аудио- или текстовый блок — с сохранением остальных временных позиций. <kbd>Shift</kbd>+<kbd>Delete</kbd> всегда сохраняет промежуток. Для явного вырезания времени используйте <strong>Удалить фрагмент со сдвигом</strong> в контекстном меню. Точную числовую правку Start/In/Out/Duration открывает <strong>Монтаж → Границы выбранного клипа</strong>. Справка остальных клавиш находится в верхнем меню.</p>
+
+<h3>Выбор режима экспорта</h3>
+<p>Для аппаратного кодирования выберите режим <strong>С перекодированием H.264/H.265</strong>, затем поле <strong>Кодирование</strong>: процессор, NVIDIA NVENC, Intel QSV, AMD AMF или Linux VAAPI. При открытии окна варианты проходят короткое пробное кодирование в фоне. В обоих списках доступны только успешно проверенные на этой машине кодировщики; остальные отключены, причина указана в подсказке. H.264 и HEVC проверяются отдельно. Проверка повторяется при смене устройства и новом открытии окна. CRF, битрейты и параметры устройства раскрываются кнопкой <strong>Дополнительные параметры</strong>.</p>
+<table>
+    <tr><th>Режим</th><th>Когда использовать</th></tr>
+    <tr><td>Без перекодирования</td><td>Простая склейка без текста и без изменения громкости - быстро, без потери качества</td></tr>
+    <tr><td>С перекодированием</td><td>Нужен для текста, изменения холста/FPS, пауз, отдельного звука, громкости и Mute; сохраняет расположение всех клипов</td></tr>
+</table>
+
+<div class="info-box">
+    Copy недоступен, если правки или параметры потоков нельзя сохранить без перекодирования. Его границы зависят от ключевых кадров. Возможности FFmpeg проверяются в фоне; выбранный кодировщик проходит короткую пробу перед экспортом. Существующий результат заменяется только после подтверждения и успешной проверки нового файла.
+</div>
+
+<h3>Битые файлы</h3>
+<p>Для разработчиков доступна отдельная проверка из корня исходников: <code>python -m src.diagnostics.video_editor_check report.json --offscreen</code>. Она использует временный профиль, открывает главное окно и два редактора, проверяет темы, доступность Qt, сохранение проекта, пробный экспорт и закрытие. Рядом с JSON сохраняется снимок окна; настройки пользователя не меняются. Проверку физического звука и скринридера выполняет оператор.</p>
+
+<ul>
+    <li><strong>Ремонт контейнера</strong> (контекстное меню файла) создаёт отдельную исправленную копию без перекодирования и переключает ссылку в проекте; оригинал и старые бэкапы остаются на месте, перепривязка отменяется через Undo</li>
+    <li><strong>Повторить анализ</strong> - перезапустить определение длительности и разрешения (например, после установки ffmpeg)</li>
+    <li>Причина ошибки видна в свойствах файла, файл можно переименовать прямо в списке</li>
+</ul>
+
+<div class="info-box">
+    Подписи включаются в готовое видео при экспорте. Если обработка недоступна, программа сообщает причину; проверить медиадвижок можно в меню «Помощь → Инструменты → FFmpeg».
+</div>
+
+<!-- ============ КАМЕРЫ ============ -->
+<h2 id="cameras">Камеры ЕЦХД</h2>
+
+<p>Окно для просмотра и записи IP-камер видеонаблюдения по протоколу RTSP. Открывается через меню <strong>Инструменты - Камеры ЕЦХД</strong>.</p>
+
+<h3>Дерево камер</h3>
+<p>Камеры организованы в виде иерархического дерева: <strong>Адрес - Кабинет - Камера</strong>. Для каждой камеры отображается:</p>
+<table>
+    <tr><th>Колонка</th><th>Описание</th></tr>
+    <tr><td>Адрес</td><td>Название адреса (здания/этажа) - группирующий узел</td></tr>
+    <tr><td>Камера</td><td>Название камеры</td></tr>
+    <tr><td>Онлайн</td><td>Доступность камеры - проверяется периодическим TCP-пингом порта 554 (RTSP)</td></tr>
+    <tr><td>Статус</td><td>Текущее состояние: ожидание, запись, переподключение, ошибка</td></tr>
+    <tr><td>Время</td><td>Длительность текущей или последней записи</td></tr>
+</table>
+
+<h3>Просмотр потока</h3>
+<p>Правый клик по камере - <strong>Посмотреть</strong> открывает RTSP-поток во внешнем плеере. Плеер выбирается в настройках:</p>
+<ul>
+    <li><strong>VLC</strong> - по умолчанию</li>
+    <li><strong>mpv</strong></li>
+    <li><strong>ffplay</strong></li>
+    <li><strong>Системный</strong> - открыть через ассоциацию операционной системы</li>
+</ul>
+
+<div class="info-box">
+    Выбранный плеер должен быть установлен в системе. Убедитесь, что <code>vlc</code>, <code>mpv</code> или <code>ffplay</code> доступен в переменной окружения <code>PATH</code>.
+</div>
+
+<h3>Запись потока</h3>
+<p>Правый клик по камере - <strong>Записать</strong> запускает запись RTSP-потока в файл формата MKV без перекодирования (поток копируется как есть). Запись выполняется встроенным медиадвижком; отдельно устанавливать ffmpeg для неё не нужно. Записи не удаляются автоматически: следите за свободным местом и удаляйте ненужные файлы самостоятельно.</p>
+<ul>
+    <li><strong>Остановить</strong> — корректно завершить запись и закрыть файл</li>
+    <li><strong>Остановить все в группе</strong> - останавливает все записи внутри адреса или кабинета</li>
+    <li><strong>Остановить все</strong> - останавливает все активные записи</li>
+</ul>
+
+<div class="info-box success">
+    Если связь с камерой прерывается во время записи, программа автоматически возобновляет запись через 3 секунды после восстановления доступности камеры. Переподключение работает, пока запущена программа. После полного выхода и нового запуска запись нужно включить заново.
+</div>
+
+<h3>Открытие папки с записями</h3>
+<p>Правый клик по камере или группе - <strong>Открыть папку</strong> открывает каталог с записями в системном файловом менеджере (Dolphin, Nautilus и др.). Папка создаётся автоматически, если её ещё не существует.</p>
+
+<h3>Настройки</h3>
+<p>Кнопка <strong>Настройки</strong> открывает диалог с тремя вкладками.</p>
+
+<h4>Камеры</h4>
+<p>Управление списком камер в виде дерева <strong>Адрес - Кабинет - Камера</strong>:</p>
+<ul>
+    <li>Кнопки <strong>Добавить адрес</strong>, <strong>Добавить кабинет</strong>, <strong>Добавить камеру</strong> - создание новых узлов</li>
+    <li>Двойной клик по ячейке - редактирование названия или IP-адреса</li>
+    <li>Перетаскивание мышью - перемещение кабинетов между адресами и камер между кабинетами</li>
+    <li>Кнопка <strong>Сканер...</strong> - импорт найденных IP-адресов из встроенного IP-сканера (см. <a href="#ip-scanner">IP-сканер</a>)</li>
+    <li>Кнопка <strong>Удалить</strong> - удаление выбранного узла</li>
+</ul>
+
+<h4>Подключение</h4>
+<table>
+    <tr><th>Параметр</th><th>Описание</th></tr>
+    <tr><td>Логин</td><td>Логин для подключения к RTSP-серверу (общий для всех камер)</td></tr>
+    <tr><td>Пароль</td><td>Пароль RTSP (общий для всех камер)</td></tr>
+    <tr><td>Таймаут пинга</td><td>Таймаут проверки доступности камеры, 1-10 сек (по умолчанию 2)</td></tr>
+    <tr><td>Интервал опроса</td><td>Периодичность проверки статуса камер, 5-300 сек (по умолчанию 20)</td></tr>
+</table>
+
+<h4>Просмотр и Запись</h4>
+<table>
+    <tr><th>Параметр</th><th>Описание</th></tr>
+    <tr><td>Каталог записи</td><td>Папка для сохранения записей. Если пусто - используется домашняя папка. Поддерживает те же подстановки, что шаблон пути</td></tr>
+    <tr><td>Плеер</td><td>Внешний плеер для просмотра потока (VLC, mpv, ffplay или системный)</td></tr>
+    <tr><td>Шаблон пути</td><td>Шаблон структуры подпапок внутри каталога записи</td></tr>
+    <tr><td>Шаблон имени файла</td><td>Шаблон имени файла записи (те же подстановки, плюс формат даты и времени strftime). Если шаблон не задан, имя файла строится как «имя камеры_дата_время»</td></tr>
+</table>
+
+<p>Каталог записи, шаблон пути и шаблон имени файла поддерживают единые подстановки:</p>
+<table>
+    <tr><th>Подстановка</th><th>Значение</th></tr>
+    <tr><td><code>%addr%</code></td><td>Адрес</td></tr>
+    <tr><td><code>%cabinet%</code></td><td>Кабинет</td></tr>
+    <tr><td><code>%camera%</code></td><td>Имя камеры</td></tr>
+    <tr><td><code>%year%</code></td><td>Год</td></tr>
+    <tr><td><code>%month%</code></td><td>Месяц</td></tr>
+    <tr><td><code>%day%</code></td><td>День</td></tr>
+    <tr><td><code>%hour%</code></td><td>Час</td></tr>
+    <tr><td><code>%min%</code></td><td>Минуты</td></tr>
+    <tr><td><code>%sec%</code></td><td>Секунды</td></tr>
+</table>
+
+<p>Дополнительно шаблон имени файла понимает обозначения даты и времени strftime (например, <code>%Y-%m-%d_%H-%M-%S</code>). Недопустимые в путях символы в адресе, кабинете и имени камеры заменяются на подчеркивание.</p>
+
+<div class="info-box">
+    Если шаблон пути не задан, используется структура по умолчанию: <code>Адрес/Год/Месяц/День/Кабинет</code>. Если шаблон имени файла не задан, используется имя по умолчанию с подстановкой <code>%camera%</code>: «имя камеры_дата_время» - записи разных камер не пересекаются по имени файла даже в общем каталоге. Расширение <code>.mkv</code> добавляется к имени файла автоматически. В диалоге настроек показывается живое превью итогового пути и имени файла.
+</div>
+
+<div class="info-box warn">
+    Укажите абсолютный путь в поле «Каталог записи» и убедитесь, что у вас есть права на запись в эту папку. При пустом поле используется домашняя папка.
+</div>
+
+<!-- ============ НАСТРОЙКИ ============ -->
+<h2 id="settings">Настройки</h2>
+
+<p>Откройте через <strong>Настройки - Конфигурация</strong>. Настройки хранятся в <code>~/.dno-tool/settings.json</code>.</p>
+
+<h3>SSH</h3>
+<table>
+    <tr><th>Параметр</th><th>По умолчанию</th><th>Описание</th></tr>
+    <tr><td>Связка учётных данных по умолчанию</td><td><em>не выбрана</em></td><td>Именованная пара логин/пароль, применяемая ко всем хостам без собственной связки. Управление связками - кнопка рядом с полем или меню «Настройки → Подключение → Связки учётных данных»</td></tr>
+    <tr><td>Порт</td><td><code>22</code></td><td>SSH-порт по умолчанию</td></tr>
+    <tr><td>Таймаут подключения</td><td><code>10</code> сек</td><td>Время ожидания соединения</td></tr>
+    <tr><td>Таймаут выполнения</td><td><code>30</code> сек</td><td>Время ожидания выполнения команды</td></tr>
+    <tr><td>SSH-ключ</td><td><code>~/.ssh/id_ed25519</code></td><td>Путь к закрытому ключу</td></tr>
+    <tr><td>Использовать sudo для non-root логина</td><td><code>выключено</code></td><td>Автоматически подавать пароль sudo для команд с <code>sudo</code> при входе не под root. Пароль берётся из связки учётных данных (собственной связки хоста или глобальной по умолчанию). Может быть переопределён для конкретного устройства в его диалоге</td></tr>
+    <tr><td>Локаль</td><td><code>ru_RU.UTF-8</code></td><td>Локаль, устанавливаемая перед выполнением SSH-команд для корректного вывода кириллицы и локализованных сообщений. Оставьте поле пустым, если на хостах локаль не сгенерирована (нет в <code>locale -a</code>) - это устранит предупреждение <code>bash: warning: setlocale: LC_ALL: cannot change locale</code>. Может быть переопределена для конкретного устройства в его диалоге</td></tr>
+</table>
+
+<h3>Связки учётных данных</h3>
+<p>Единственный источник учётных данных SSH - <strong>именованные связки</strong> (логин и пароль). Открываются через <strong>Настройки → Подключение → Связки учётных данных</strong>. Пароли шифруются при сохранении в файл настроек. Каждому устройству можно назначить свою связку (в диалоге устройства, в мастере настройки, при импорте диапазона IP); хосты без собственной связки используют глобальную связку по умолчанию.</p>
+
+<h3>Выполнение команд через sudo</h3>
+<p>Если на целевых машинах SSH-логин выполняется не под root, а под обычным пользователем с правами sudo (например, членом группы <code>wheel</code>), включите настройку «Использовать sudo для non-root логина» - глобально или для отдельного устройства. При этом:</p>
+<ul>
+    <li>Команды, содержащие <code>sudo</code>, автоматически получают пароль - программа перехватывает приглашение <code>[sudo] password for ...:</code> и подаёт пароль из связки учётных данных устройства (или глобальной связки по умолчанию)</li>
+    <li>Команды без <code>sudo</code> получают его автоматически в начале (если для устройства включено sudo)</li>
+    <li>Плейсхолдер <code>%sudo%</code> в тексте команды раскрывается в <code>sudo </code> если sudo включено, иначе в пустую строку - удобно для точечной вставки повышения прав в середину составных команд, например <code>echo x | %sudo%tee /etc/y</code></li>
+    <li>Установка сервисов в мастере настройки (SSH-ключи, Veyon, VNC) также корректно работает через sudo на non-root хостах</li>
+</ul>
+<p>Для отдельного устройства режим sudo задаётся в диалоге редактирования (двойной клик по устройству): «По умолчанию» (наследовать глобальную настройку), «Да» или «Нет». При сохранении с включённым sudo и отсутствующим паролем в связке показывается предупреждение.</p>
+
+<h3>Локаль SSH-команд</h3>
+<p>Перед выполнением SSH-команды программа устанавливает переменные окружения <code>LANG</code>, <code>LC_ALL</code> и <code>LC_CTYPE</code> для корректного вывода кириллицы и локализованных сообщений (заголовки колонок <code>df</code>, <code>free</code>, статусы <code>systemctl</code>, сообщения об ошибках и т.д.). По умолчанию используется <code>ru_RU.UTF-8</code>.</p>
+<p>Если на целевой системе указанная локаль не сгенерирована (отсутствует в <code>locale -a</code>), жёсткая установка вызывает предупреждение <code>bash: warning: setlocale: LC_ALL: cannot change locale (ru_RU.UTF-8)</code>. В этом случае:</p>
+<ul>
+    <li><strong>Глобально</strong> - очистите поле «Локаль» в настройках SSH. Переменные окружения не будут устанавливаться, предупреждение исчезнет</li>
+    <li><strong>Для отдельного устройства</strong> - в диалоге редактирования выберите пункт «(отключить)» в поле «Локаль». Экспорт локали будет отключён только для этого хоста</li>
+    <li>Можно также выбрать другую локаль из списка или ввести свою (например, <code>en_US.UTF-8</code> или <code>C.UTF-8</code>)</li>
+</ul>
+<p>Настройка локали для отдельного устройства: «По умолчанию» (наследовать глобальную) или явное значение. Поле с выпадающим списком стандартных локалей и возможностью ввода своего значения.</p>
+
+<h3>Приоритет учётных данных</h3>
+<p>При выполнении команды логин и пароль определяются в следующем порядке:</p>
+<ol>
+    <li><strong>Связка устройства</strong> - если хосту назначена собственная связка учётных данных</li>
+    <li><strong>Глобальная связка по умолчанию</strong> - если собственная связка не выбрана</li>
+    <li><strong>Значения по умолчанию</strong> - логин <code>root</code>, пароль не указан</li>
+</ol>
+
+<h3>Аутентификация по ключу</h3>
+<p>Если пароль не указан, программа пытается использовать SSH-ключ. Поддерживаются ключи Ed25519 (рекомендуется), RSA и ECDSA.</p>
+
+<h3>Мониторинг</h3>
+<table>
+    <tr><th>Параметр</th><th>По умолчанию</th><th>Описание</th></tr>
+    <tr><td>Таймаут ping</td><td><code>2.0</code> сек</td><td>Время ожидания ответа при проверке порта</td></tr>
+    <tr><td>Интервал проверки</td><td><code>30</code> сек</td><td>Частота проверки доступности устройств</td></tr>
+    <tr><td>Потоки сканирования</td><td><code>8</code></td><td>Количество параллельных потоков для IP-сканера</td></tr>
+</table>
+<p>Количество потоков выбирается ползунком из фиксированного набора значений: <code>1, 2, 4, 8, 16, 32, 48, 64</code>. Текущее значение отображается в лейбле справа от ползунка.</p>
+
+<div class="info-box">
+    Параметры интеграции с Veyon (URL WebAPI, ключ, интервал миниатюр, качество, сжатие, формат, множитель оверсэмплинга) - см. раздел <a href="#veyon">Veyon: мониторинг и доступ</a>, подраздел «Параметры Veyon».
+</div>
+
+<div class="info-box">
+    Параметры встроенного веб-сервера (адрес, порт, пользователи, хранение заданий, пулы потоков) - см. раздел <a href="#web-server">Веб-сервер управления</a>, подраздел «Параметры веб-сервера».
+</div>
+
+<h2 id="web-server">Веб-сервер управления</h2>
+
+<p>DNO Tool содержит встроенный веб-сервер, позволяющий управлять устройствами и выполнять команды через браузер - без установки десктоп-приложения на клиентской машине. Для доступа из браузера DNO Tool должен оставаться запущенным на компьютере, где включён сервер.</p>
+
+<div class="info-box">
+    <strong>Возможности веб-интерфейса:</strong>
+    <ul style="margin:6px 0 0;">
+        <li>Дерево устройств с группами, поиск, массовый выбор</li>
+        <li>Дерево задач из библиотеки команд с поиском</li>
+        <li>Потоковое выполнение команд с выводом результатов в реальном времени (WebSocket)</li>
+        <li>Ввод параметров команды через модальный диалог</li>
+        <li>Режимы отображения устройств: список (с иконками онлайн/оффлайн), иконки, миниатюры (Veyon)</li>
+        <li>Фильтр «Только онлайн» слева от переключателя вида - скрывает недоступные устройства, как в приложении</li>
+        <li>Группировка выбранных устройств по папкам</li>
+        <li>Проверка статуса устройств и живые миниатюры экранов</li>
+        <li>Удалённый рабочий стол прямо в браузере (VNC/Veyon) - без установки VNC-клиента</li>
+        <li>При отсутствии Veyon на машине оператора Veyon-элементы (кнопки команд, миниатюры) автоматически скрываются - остаются только статусы и базовые функции</li>
+        <li>Многопользовательский режим: у каждого пользователя свои задания и выбор устройств</li>
+        <li>Аутентификация по логину/паролю, восстановление сессии после обновления страницы</li>
+    </ul>
+</div>
+
+<h3>Запуск и настройка</h3>
+<p>Откройте <strong>Настройки → Удалённое управление → Веб-сервер управления</strong>. Диалог позволяет:</p>
+<ul>
+    <li>Включать/выключать сервер кнопкой «Запустить»/«Остановить»</li>
+    <li>Открывать веб-интерфейс в браузере одной кнопкой</li>
+    <li>Задавать адрес и порт прослушивания</li>
+    <li>Управлять пользователями: добавлять, редактировать и удалять учётные записи; у каждого пользователя - свои задания и выбор устройств. Пароли в таблице пользователей скрыты маской и видны только при редактировании ячейки</li>
+    <li>Включать автозапуск сервера при старте приложения</li>
+    <li>Настраивать размеры пулов потоков (миниатюры/статусы и команды) ползунками из набора <code>1, 2, 4, 8, 16, 32, 48, 64</code></li>
+</ul>
+
+<p>После изменения настроек сервер автоматически перезапускается, если он был запущен.</p>
+
+<div class="info-box warn">
+    <strong>Безопасность.</strong> По умолчанию сервер слушает все интерфейсы (<code>0.0.0.0</code>). Обязательно задайте надёжные пароли учётным записям перед запуском в сети. Сервер выполняет SSH/SFTP-команды от имени учётных данных, заданных в настройках и устройствах приложения.
+</div>
+
+<h3>HTTPS</h3>
+<p>В настройках сервера выберите «Выпустить сертификат» или «Свой сертификат». При выпуске перечислите имена и IP-адреса, по которым будете открывать страницу. Кнопка «Сохранить сертификат для браузера…» позволяет перенести сертификат на клиентский компьютер и добавить его в доверенные. Закрытый ключ передавать пользователям не нужно. Открывайте адрес, указанный в сертификате.</p>
+<h3>Аутентификация и сессии</h3>
+<p>Доступ к веб-интерфейсу возможен только для аутентифицированных пользователей. Сервер поддерживает два способа входа:</p>
+<ul>
+    <li><strong>Форма входа в браузере</strong> - при открытии страницы пользователь вводит логин и пароль, сервер создаёт сессию и выдаёт токен</li>
+    <li><strong>HTTP Basic</strong> - логин/пароль передаются в заголовке каждого запроса (для скриптов и внешних клиентов)</li>
+</ul>
+
+<p>Каждая вкладка браузера получает свой <strong>идентификатор сессии</strong>: выбор устройств сохраняется на сервере и восстанавливается после обновления страницы или кратковременной потери связи. Токен хранится в браузере и используется для запросов изображений (иконки, миниатюры), куда браузер не отправляет заголовок Basic.</p>
+
+<div class="info-box">
+    <strong>Многопользовательский режим.</strong> В диалоге настройки задаётся список учётных записей. Каждый пользователь видит только свои задания - доступ к чужим заданиям запрещён. Это позволяет работать нескольким администраторам с одного сервера одновременно, не мешая друг другу.
+</div>
+
+<h3>Параметры веб-сервера</h3>
+<table>
+    <tr><th>Параметр</th><th>По умолчанию</th><th>Описание</th></tr>
+    <tr><td>Запускать при старте</td><td><code>выключено</code></td><td>Автозапуск сервера при запуске приложения</td></tr>
+    <tr><td>Адрес</td><td><code>0.0.0.0</code></td><td>Адрес привязки (пусто = все интерфейсы)</td></tr>
+    <tr><td>Порт</td><td><code>8765</code></td><td>Порт прослушивания (1-65535)</td></tr>
+    <tr><td>Пользователи</td><td>-</td><td>Список учётных записей: логин и пароль для входа в веб-интерфейс. Каждый пользователь видит только свои задания. Сервер не запускается, если список пуст</td></tr>
+    <tr><td>Хранение заданий</td><td><code>30</code> мин</td><td>Сколько хранить завершённые задания (0 = вечно, до перезапуска сервера). Активные задания не удаляются по времени</td></tr>
+    <tr><td>Потоки (миниатюры/статусы)</td><td><code>8</code></td><td>Размер пулов для миниатюр Veyon и пингов статусов</td></tr>
+    <tr><td>Потоки команд</td><td><code>8</code></td><td>Размер пула для выполнения SSH/SFTP-команд</td></tr>
+</table>
+
+<h2 id="ssh-keys">Управление SSH-ключами</h2>
+
+<p>Окно для работы с локальными SSH-ключами оператора: создание, удаление, экспорт, импорт и просмотр известных хостов. Открывается через меню <strong>Настройки → Подключение → Управление SSH ключами</strong>.</p>
+
+<p>В таблице показаны все ключи в каталоге <code>~/.ssh</code>: тип, наличие закрытого и открытого файла и совпадают ли они друг с другом. Ключ, который программа использует для подключений по умолчанию, отмечен отдельно. Вверху сразу видно, есть ли оба файла нужного ключа и всё ли с ними в порядке.</p>
+
+<h3>Операции</h3>
+<table>
+    <tr><th>Кнопка</th><th>Действие</th></tr>
+    <tr><td>Создать пару</td><td>Создать новую пару ключей (Ed25519, RSA или ECDSA) в <code>~/.ssh</code></td></tr>
+    <tr><td>Удалить</td><td>Удалить выбранный ключ (обе его части - закрытую и открытую)</td></tr>
+    <tr><td>Экспорт</td><td>Сохранить выбранную пару в ZIP-архив</td></tr>
+    <tr><td>Импорт</td><td>Загрузить ключ (одиночный файл или ZIP-архив) в <code>~/.ssh</code>. Если есть только закрытый ключ, открытый будет создан автоматически</td></tr>
+    <tr><td>Извлечь public</td><td>Создать или обновить открытый ключ из выбранного закрытого</td></tr>
+    <tr><td>Просмотр known_hosts</td><td>Открыть окно просмотра известных хостов</td></tr>
+</table>
+
+<div class="info-box">
+    Здесь управляются только ключами на вашей машине. Установка ключей на устройства выполняется в <a href="#setup-wizard">мастере первоначальной настройки</a> при выборе SSH в списке сервисов.
+</div>
+
+<div class="info-box success">
+    Поддерживаются ключи Ed25519 (рекомендуется), RSA и ECDSA. При импорте ключи со стандартными именами распознаются автоматически, для остальных программа предложит ввести имя вручную.
+</div>
+
+<!-- ============ VEYON ============ -->
+<h2 id="veyon">Veyon: мониторинг и доступ</h2>
+
+<p>Интеграция с <a href="https://veyon.io">Veyon</a> позволяет просматривать экраны устройств в виде живых миниатюр прямо в списке устройств, а также подключаться к удалённым машинам для просмотра и управления. В отличие от записи экрана, миниатюры обновляются в реальном времени через WebAPI Veyon (HTTP REST, порт 11080).</p>
+
+<div class="info-box">
+    <strong>Требования для работы:</strong>
+    <ul style="margin:6px 0 0;">
+        <li><strong>Veyon</strong> установлен на машине оператора (<code>veyon-cli</code> доступен в PATH)</li>
+        <li><strong>Veyon Service</strong> запущен на машине оператора</li>
+        <li><strong>WebAPI-плагин</strong> включён в Veyon Configurator (порт 11080 по умолчанию)</li>
+        <li>Создан <strong>ключ аутентификации</strong> и выбран в настройках Veyon</li>
+        <li>На целевых машинах <strong>Veyon Service</strong> запущен (для просмотра и управления)</li>
+    </ul>
+</div>
+
+<h3>Живые миниатюры экранов</h3>
+<p>Миниатюры отображаются прямо в списке устройств вместо стандартных иконок. Управление режимом - через панель инструментов списка устройств:</p>
+<ul>
+    <li><strong>Кнопка-тумблер миниатюр</strong> - включает/выключает режим живых миниатюр</li>
+    <li><strong>Ползунок размера</strong> - регулирует размер иконок/миниатюр от 32 до 512 пикселей</li>
+    <li><strong>Кнопка «только онлайн»</strong> - фильтрует список, показывая только доступные устройства</li>
+</ul>
+
+<p>Если на машине оператора Veyon не установлен или его сервис остановлен, кнопка миниатюр и переключатель стиля скрываются с панели инструментов - остаются только фильтр онлайн и ползунок размера. В режиме миниатюр без Veyon вместо снимков экрана показываются иконки онлайн/оффлайн, окрашенные по реальному статусу устройств. Когда Veyon становится доступен (запущен сервис), скрытые элементы автоматически возвращаются - приложение проверяет состояние каждые 60 секунд.</p>
+
+<p>Миниатюры имеют формат 16:9, центрируются на прозрачном квадрате. Обновление происходит по таймеру для каждого устройства индивидуально с заданным интервалом и небольшим разбросом для равномерной нагрузки. При изменении размера ползунком миниатюры мгновенно перерисовываются из уже загруженного изображения - без ожидания следующего обновления.</p>
+
+<p>Доступны два стиля отображения миниатюр (настраивается в диалоге <strong>Настройки Veyon</strong> на вкладке «Миниатюры»):</p>
+<ul>
+    <li><strong>monitor</strong> - миниатюра вписана в рамку монитора (по умолчанию)</li>
+    <li><strong>plain</strong> - голая картинка 16:9 без рамки</li>
+</ul>
+
+<p>Миниатюры запрашиваются только для <strong>онлайн-устройств</strong>. При потере связи миниатюра автоматически очищается, а при восстановлении - возобновляется. При группировке устройств по папкам миниатюры корректно отображаются внутри каждой группы.</p>
+
+<p>Если компьютер включён, но сервис Veyon на нём не работает или не установлен, его миниатюра окрашивается в <strong>оранжевый</strong> цвет - сразу видно, на какие машины нельзя заглянуть, не путая их с выключенными (красными) и рабочими (зелёными). Работает и в приложении, и в веб-интерфейсе.</p>
+
+<p>По умолчанию миниатюры захватываются только с устройств, отвечающих на обычный пинг. Такое поведение можно изменить переключателем <strong>«Учитывать обычный пинг»</strong> в диалоге <strong>Настройки Veyon</strong> на вкладке «Миниатюры». Если переключатель выключен, захват выполняется и с устройств, не отвечающих на обычный пинг (бывает, когда их файрвол закрывает служебные порты, но Veyon доступен): рабочий экран при этом отображается как обычно. Если же недоступны и обычный пинг, и Veyon - устройство по-прежнему красное.</p>
+
+<h3>Просмотр экрана и управление</h3>
+<p>Для удалённого доступа к экрану устройства:</p>
+<ol class="steps">
+    <li>Правый клик по устройству в списке</li>
+    <li>Меню <strong>Veyon</strong> - <strong>Просмотр экрана</strong> или <strong>Управление</strong></li>
+    <li>Откроется окно Veyon с подключением к удалённой машине</li>
+</ol>
+
+<table>
+    <tr><th>Режим</th><th>Описание</th></tr>
+    <tr><td>Просмотр экрана</td><td>Только наблюдение за экраном удалённой машины</td></tr>
+    <tr><td>Управление</td><td>Полный удалённый доступ: мышь, клавиатура</td></tr>
+</table>
+
+<p>Подключение выполняется через <code>veyon-cli remoteaccess view|control &lt;host&gt;</code>. При закрытии DNO Tool все активные окна Veyon автоматически останавливаются.</p>
+
+<p>Веб-интерфейс также поддерживает удалённый рабочий стол прямо в браузере - без установки VNC-клиента. Подробнее - в разделе <a href="#remote-desktop">Удалённый рабочий стол</a>.</p>
+
+<p>Команды Veyon (блокировка экрана и ввода, перезагрузка, выключение, завершение сеанса, вход пользователя, открытие сайта, запуск программы, текстовое сообщение, включение по сети) доступны в контекстном меню устройства, на панели инструментов над списком и в веб-интерфейсе. На панели и в веб-интерфейсе команды применяются сразу ко всем выбранным устройствам.</p>
+
+<p>Контекстное меню устройства разделено на два подменю: <strong>«Управление»</strong> (включение по сети, перезагрузка, выключение, завершение сеанса, вход пользователя - через SSH и DBus, показывается всегда) и <strong>«Veyon»</strong> (просмотр экрана, управление, блокировки, вход пользователя через Veyon, сообщения, перезапуск сервиса - скрывается целиком при отсутствии Veyon). Команда «Выход пользователя» в подменю «Veyon» завершает сеанс штатно через Veyon WebAPI, а устойчивый вариант «Завершить сеанс» в подменю «Управление» работает через SSH на уровне системы и не требует Veyon.</p>
+
+<p>Команда <strong>«Вход пользователя»</strong> в подменю «Управление» выполняет удалённый вход через системный DBus-сервис <code>org.mos.auth</code> (доступен на ROSA Linux/MOS при настроенной подсистеме <code>mos-auth</code>). Сервис работает только пока на хосте активен экран входа SDDM и никто не вошёл в систему - при ошибке входа показывается конкретная причина (кто залогинен, выключена ли подсистема <code>mos-auth</code>, какая тема SDDM используется) и способ устранения.</p>
+
+<p>Кнопки питания (включение по сети, перезагрузка, выключение, завершение сеанса) больше не зависят от Veyon и всегда видны - даже если Veyon не установлен или сервис остановлен.</p>
+
+<p>При отсутствии Veyon на машине оператора подменю «Veyon» в контекстном меню автоматически скрывается - остаются только функции из «Управления», не зависящие от Veyon. Меню <strong>Настройки Veyon</strong> остаётся доступным всегда: через него можно диагностировать состояние, запустить остановленный сервис и настроить ключи.</p>
+
+<p>Команда <strong>«Перезагрузить сервис»</strong> выполняет по SSH <code>systemctl restart veyon</code> на всех выбранных устройствах и доступна в тех же местах, что и остальные команды Veyon, включая панель инструментов окна удалённого доступа VNC. Удобна при зависании Veyon Service на хостах или после изменения его настроек.</p>
+
+<h3>Диалог «Настройки Veyon»</h3>
+<p>Открывается через меню <strong>Настройки - Удалённое управление - Настройки Veyon</strong>. Вкладки остаются доступными всегда, когда найден <code>veyon-cli</code> - операции с ключами и конфигом не требуют запущенного сервиса. Содержит пять вкладок:</p>
+
+<div class="card-grid">
+    <div class="card">
+        <h4>WebAPI</h4>
+        <ul>
+            <li>Включение/отключение WebAPI-сервера</li>
+            <li>Настройка порта (по умолчанию 11080)</li>
+            <li>Управление Veyon Service: запуск, остановка, перезапуск</li>
+            <li>Регистрация/отмена автозапуска сервиса</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Ключи</h4>
+        <ul>
+            <li>Таблица ключей: имя, тип, ID пары, группа доступа</li>
+            <li>Создание пары ключей (private + public)</li>
+            <li>Удаление, экспорт, импорт ключей</li>
+            <li>Извлечение открытого ключа из закрытого</li>
+            <li>Изменение группы доступа</li>
+            <li>Выбор активного ключа для миниатюр</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Миниатюры</h4>
+        <ul>
+            <li>Интервал обновления (1-60 сек)</li>
+            <li>Качество изображения (0-100)</li>
+            <li>Уровень сжатия PNG (0-9)</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Диагностика</h4>
+        <ul>
+            <li>Проверка наличия veyon-cli</li>
+            <li>Проверка ключа аутентификации</li>
+            <li>Проверка доступности WebAPI</li>
+            <li>Проверка статуса Veyon Service</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Установка</h4>
+        <ul>
+            <li>Linux: установка пакетов через dnf</li>
+            <li>Windows: ссылка на MSI-установщик</li>
+            <li>Проверка наличия пакетов</li>
+        </ul>
+    </div>
+</div>
+
+<div class="info-box">
+    Операции с ключами, настройка WebAPI и управление сервисом выполняются с правами администратора. Если программа запущена обычным образом, при выполнении такой операции появится <strong>системный запрос авторизации</strong> (UAC на Windows, запрос пароля на Linux) - просто подтвердите его. Запуск программы с правами администратора остаётся удобным вариантом при массовой настройке - в этом случае запросы не появляются.
+</div>
+
+<h3>Параметры Veyon</h3>
+<table>
+    <tr><th>Параметр</th><th>По умолчанию</th><th>Описание</th></tr>
+    <tr><td>URL WebAPI</td><td><code>http://localhost:11080/api/v1/</code></td><td>Адрес WebAPI сервера Veyon</td></tr>
+    <tr><td>Имя ключа</td><td><code>teacher</code></td><td>Ключ аутентификации для захвата миниатюр</td></tr>
+    <tr><td>Интервал миниатюр</td><td><code>5</code> сек</td><td>Частота обновления миниатюр экранов</td></tr>
+    <tr><td>Качество</td><td><code>75</code></td><td>Качество JPEG (0-100, выше - лучше). Действует только для формата JPEG</td></tr>
+    <tr><td>Сжатие</td><td><code>3</code></td><td>Уровень сжатия PNG (0-9, меньше - лучше качество). Действует только для формата PNG</td></tr>
+    <tr><td>Ширина миниатюры</td><td><code>128</code> пикс</td><td>Ширина запрашиваемой миниатюры (фактически запрашивается с множителем оверсэмплинга для чёткости)</td></tr>
+    <tr><td>Формат</td><td><code>png</code></td><td>Формат изображения: png (без потерь) или jpeg (сжатие с потерями)</td></tr>
+    <tr><td>Множитель</td><td><code>2</code></td><td>Множитель оверсэмплинга (1-4): во сколько раз запрашивать шире отображаемого</td></tr>
+</table>
+
+<!-- ============ УДАЛЁННЫЙ РАБОЧИЙ СТОЛ ============ -->
+<h2 id="remote-desktop">Удалённый рабочий стол</h2>
+
+<p>Веб-интерфейс DNO Tool позволяет подключаться к экрану устройства прямо из браузера - без установки VNC-клиента. Поддерживаются два режима, которые определяются автоматически для каждого устройства:</p>
+
+<ul>
+    <li><strong>VNC</strong> - прямой доступ к x11vnc на хосте. Полноценный удалённый рабочий стол: буфер обмена, изменение размера сессии, все кодеки. Рекомендуемый режим</li>
+    <li><strong>Veyon</strong> - доступ через Veyon с аутентификацией по ключу. Ограниченный режим: недоступны буфер обмена и изменение размера сессии. Используется, если на хосте не установлен x11vnc, но есть Veyon</li>
+</ul>
+
+<p>При открытии удалённого рабочего стола интерфейс проверяет доступность обоих режимов и выбирает VNC, если он доступен, иначе - Veyon. Если недоступны оба - подключение не выполняется. Вторым VNC-сервером наряду с x11vnc может быть krfb - см. <a href="#krfb">KRFB - общий экран через KDE</a>.</p>
+
+<h3>Как подключиться</h3>
+<ol class="steps">
+    <li>В веб-интерфейсе переключитесь в режим «Миниатюры»</li>
+    <li>Наведите курсор на миниатюру устройства - в правом верхнем углу появится кнопка монитора</li>
+    <li>Нажмите на неё - откроется новое окно с удалённым рабочим столом</li>
+</ol>
+
+<div class="info-box">
+    Кнопка удалённого доступа появляется только если на машине оператора установлен Veyon (и включён RFB-мост) или на хосте доступен VNC-порт.
+</div>
+
+<h3>Панель управления</h3>
+<p>Окно удалённого рабочего стола содержит вертикальную панель управления слева (в стиле Proxmox/noVNC). Панель можно перетащить за маркер к любому краю окна - сверху, снизу, слева или справа. Панель автоматически скрывается через 2 секунды бездействия и появляется при наведении курсора.</p>
+
+<div class="card-grid">
+    <div class="card">
+        <h4>Питание</h4>
+        <ul>
+            <li>Выключение и перезагрузка хоста</li>
+            <li>Включение по сети (Wake-on-LAN)</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Veyon</h4>
+        <ul>
+            <li>Блокировка и разблокировка экрана</li>
+            <li>Блокировка и разблокировка ввода</li>
+            <li>Текстовое сообщение пользователю</li>
+            <li>Перезапуск сервиса Veyon на хосте</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Буфер обмена</h4>
+        <ul>
+            <li>Отправка текста на удалённую машину</li>
+            <li>Получение текста из буфера обмена хоста</li>
+            <li>Только в VNC-режиме</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Дополнительно</h4>
+        <ul>
+            <li>Клавиши-модификаторы: Ctrl, Alt, Win (залипание)</li>
+            <li>Отправка Tab, Esc, Ctrl+Alt+Del</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Настройки</h4>
+        <ul>
+            <li>Совместный сеанс, обрезка по окну, масштабирование</li>
+            <li>Кодек (авто/tight/zlib/raw), качество и сжатие</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Прочее</h4>
+        <ul>
+            <li>Полноэкранный режим</li>
+            <li>Отключение от хоста</li>
+        </ul>
+    </div>
+</div>
+
+<h3>Подсказки</h3>
+<p>Все кнопки панели управления и основного интерфейса снабжены всплывающими подсказками. Используются собственные подсказки в тёмной теме вместо стандартных браузерных - они появляются с небольшой задержкой и плавно скрываются при уходе курсора.</p>
+
+<div class="info-box warn">
+    <strong>Ограничения Veyon-режима.</strong> При подключении через Veyon недоступны буфер обмена и изменение размера сессии - Veyon пропускает только базовые сообщения VNC. Для полнофункциональной работы установите x11vnc на хосты (через <a href="#wizard-remote">мастер настройки</a> или <a href="#diagnostics">диагностику</a>).
+</div>
+
+<!-- ============ НАСТРОЙКИ VNC ============ -->
+<h2 id="vnc-settings">Настройки VNC</h2>
+
+<p>Единый диалог параметров VNC-серверов (x11vnc и krfb) для удалённого доступа. Открывается через меню <strong>Настройки - Удалённое управление - Настройки VNC (x11vnc / krfb)</strong>. Селектор вверху переключает сервер, ниже - одна вкладка «Параметры». Порт и пароль общие для обоих серверов.</p>
+
+<table>
+    <tr><th>Параметр</th><th>По умолчанию</th><th>Назначение</th></tr>
+    <tr><td>Порт по умолчанию</td><td><code>5900</code></td><td>Общий VNC-порт обоих серверов - x11vnc и krfb. Может быть переопределён для конкретного устройства полем «Порт VNC» в редакторе хоста</td></tr>
+    <tr><td>VNC-пароль</td><td><em>пусто</em></td><td>Пароль VNC (для установки задайте пароль). Кнопка «Сгенерировать» создаёт случайный 12-символьный пароль</td></tr>
+    <tr><td>Кодек по умолчанию</td><td><code>Авто</code></td><td>Кодек VNC-сессии: <code>Авто</code>, <code>Tight (JPEG)</code>, <code>Zlib</code> или <code>Raw</code></td></tr>
+    <tr><td>Разрешить изменение размера сессии</td><td>включено</td><td>Изменение размера рабочего стола под окно клиента. Полноценно поддерживается только в VNC-режиме; в Veyon-режиме недоступно</td></tr>
+</table>
+
+<div class="info-box">
+    Диагностика VNC (проверка порта, баннера RFB, автозапуска сервиса и аутентификации) выполняется в отдельном окне <a href="#diagnostics">Диагностика</a>. Установка выбранного VNC-сервера на хосты — на шаге мастера <a href="#wizard-remote">«Удалённые → Установка»</a>.
+</div>
+
+<h2 id="krfb">KRFB - общий экран через KDE</h2>
+<p>Второй способ общего экрана - <strong>krfb</strong> (KDE Remote Desktop Server): на хосте запускается krfb в пользовательском сеансе KDE, доступ - по VNC-паролю. Выбор сервера - селектором «x11vnc | krfb» вверху окна настроек и на первом шаге <a href="#setup-wizard">мастера настройки</a> (мастер при необходимости предложит установить krdc и krfb на ваш компьютер). VNC-пароль общий для обоих серверов; повторный запуск установки применяет новый пароль к уже настроенным хостам.</p>
+
+<div class="card-grid">
+    <div class="card">
+        <h4>Доступ к экрану</h4>
+        <ul>
+            <li>Подменю «VNC (KRFB)» в контекстном меню хоста</li>
+            <li>Просмотр и управление отдельно</li>
+            <li>На Linux - через krdc или браузер, на Windows - через браузер</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Пароль и сервис</h4>
+        <ul>
+            <li>Смена пароля прямо из подменю хоста</li>
+            <li>Перезапуск сервиса из подменю хоста</li>
+            <li>Настройки - меню «Настройки VNC (x11vnc / krfb)»</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Диагностика</h4>
+        <ul>
+            <li>Колонка «Бекенд»: какой сервер активен по факту</li>
+            <li>Проверка порта, автозапуска и пароля</li>
+            <li>Предупреждение при несовпадении с выбранным</li>
+        </ul>
+    </div>
+</div>
+
+<h3>Подменю «VNC (KRFB)»</h3>
+<p>Правый клик по хосту - подменю названо по активному бекенду («VNC (KRFB)» или «VNC (x11vnc)», у каждого хоста может быть свой). Состав зависит от системы:</p>
+<table>
+    <tr><th>Пункт</th><th>Linux</th><th>Windows</th></tr>
+    <tr><td>Просмотр экрана / Управление</td><td>Клиент krdc (если установлен) + браузер</td><td>Только браузер</td></tr>
+    <tr><td>Сменить пароль</td><td>Да, через SSH</td><td>Да, через SSH</td></tr>
+    <tr><td>Перезапустить</td><td>Да, через SSH</td><td>Да, через SSH</td></tr>
+</table>
+
+<div class="info-box">
+    Пункты через krdc появляются, только если krdc установлен на вашем компьютере - иначе клик давал бы ошибку вместо подключения. Подменю скрыто для хостов удалённых нод (нет прямого SSH).
+</div>
+
+<div class="info-box warn">
+    <strong>Требование к хосту.</strong> krfb работает в X-сессии вошедшего пользователя. Если никто не вошёл в графическую сессию - подключаться не к чему; диагностика покажет неактивный бекенд.
+</div>
+
+<!-- ============ ДИАГНОСТИКА ============ -->
+<h2 id="diagnostics">Диагностика</h2>
+
+<p>Окно «Диагностика» (меню <strong>Помощь → Инструменты → Диагностика</strong>) помогает быстро понять, что работает на выбранных устройствах, а что нет - без необходимости подключаться к каждому вручную.</p>
+
+<h3>Что проверяет</h3>
+<table>
+    <tr><th>Компонент</th><th>Что проверяется</th></tr>
+    <tr><td><strong>SSH</strong></td><td>Можно ли подключиться и выполнить команду, а также какие права sudo доступны (root, NOPASSWD, sudo с паролем или нет sudo)</td></tr>
+    <tr><td><strong>Veyon</strong></td><td>Запущен ли Veyon на устройстве и возможно ли подключение к нему</td></tr>
+    <tr><td><strong>VNC</strong></td><td>Для выбранного в настройках способа общего экрана (x11vnc или krfb): какой бекенд фактически активен на устройстве, доступен ли его порт, автозапуск и принимает ли пароль</td></tr>
+</table>
+
+<h3>Как пользоваться</h3>
+<ol class="steps">
+    <li>Отметьте, что именно хотите проверить (SSH, Veyon, VNC - по умолчанию выбрано всё)</li>
+    <li>Отметьте устройства в списке</li>
+    <li>Нажмите <strong>Запустить</strong> - все проверки выполняются одновременно</li>
+    <li>В таблице появится результат: ✅ работает, ❌ ошибка, ⚠ предупреждение и т. п.</li>
+    <li>Двойной клик по строке открывает подробный отчёт по конкретному компьютеру</li>
+</ol>
+
+<p>Результаты сгруппированы по компонентам, так что видно сразу - например, что SSH работает, а VNC нет. Состав колонок меняется в зависимости от того, какие компоненты вы выбрали.</p>
+
+<div class="info-box success">
+    Диагностика работает всегда - даже если Veyon не установлен на вашей машине. Для проверок используются те же логин, пароль и ключ, что и при обычном выполнении команд.
+</div>
+
+<h2 id="commands-editor">Редактор команд</h2>
+<p>Откройте через <strong>Настройки → Данные → Редактировать задачи</strong>. Слева - дерево категорий и команд, справа - форма редактирования.</p>
+
+<h3>Создание и редактирование</h3>
+<ul>
+    <li><strong>Правый клик по дереву</strong> - добавить категорию или команду, удалить элемент</li>
+    <li><strong>Перетаскивание</strong> - изменение структуры дерева</li>
+    <li><strong>Двойной клик на команде</strong> - редактирование свойств: название, описание, таймаут, параметры</li>
+</ul>
+
+<h3>Поля команды</h3>
+<table>
+    <tr><th>Поле</th><th>Описание</th><th>Обязательно</th></tr>
+    <tr><td>Название</td><td>Отображаемое имя команды в списке</td><td>Да</td></tr>
+    <tr><td>Описание</td><td>Подсказка при наведении на команду</td><td>Нет</td></tr>
+    <tr><td>Таймаут</td><td>Время ожидания в секундах (0-7200)</td><td>Нет</td></tr>
+    <tr><td>Параметры</td><td>Список имён параметров (<code>%param1%</code>, <code>%param2%</code>)</td><td>Нет</td></tr>
+</table>
+
+<h3>Шаги команды</h3>
+<p>Каждая команда содержит один или несколько шагов (SSH, SFTP, LOCAL). Управление шагами:</p>
+<ul>
+    <li><strong>Добавить SSH-команду</strong> - открывает Bash-редактор с подсветкой синтаксиса</li>
+    <li><strong>Добавить SFTP-команду</strong> - открывает SFTP-редактор с выбором направления и обзором файлов</li>
+    <li><strong>Добавить локальную команду</strong> - открывает Bash-редактор</li>
+    <li><strong>Двойной клик на шаге</strong> - редактирование</li>
+    <li><strong>Удалить</strong> - удалить выбранный шаг</li>
+</ul>
+
+<h3>Импорт и экспорт команд</h3>
+<p>В редакторе можно передавать команды между экземплярами DNO Tool через текст в кодировке Base64:</p>
+<ul>
+    <li><strong>Экспорт</strong> - выбрать команду, нажать «Экспорт», скопировать код</li>
+    <li><strong>Импорт</strong> - вставить код Base64. Программа определит формат:
+        <ul>
+            <li>Полная команда - заменяет текущую</li>
+            <li>Список шагов - добавляет к текущей команде</li>
+        </ul>
+    </li>
+</ul>
+
+<h3>Файловый импорт и экспорт библиотеки</h3>
+<ul>
+    <li><strong>Файл - Задачи - Экспортировать команды</strong> - сохранить всю библиотеку в JSON-файл</li>
+    <li><strong>Файл - Задачи - Импортировать команды</strong> - загрузить команды из JSON-файла. Откроется диалог с превью изменений и выбором режима: <strong>Обновить</strong> (добавить новое, совпадающие имена разрешить вручную в диалоге конфликтов) или <strong>Заменить</strong> (целиком пересобрать библиотеку из файла)</li>
+</ul>
+
+<div class="info-box orange">
+    <strong>Важно!</strong> Изменения в редакторе сохраняются в <code>~/.dno-tool/commands.json</code>. При обновлении приложения файл не перезаписывается автоматически - используйте импорт для обновления библиотеки команд.
+</div>
+
+<!-- ============ МЕНЮ ВИД ============ -->
+<h2 id="view-menu">Меню «Вид»</h2>
+
+<p>Меню <strong>Вид</strong> управляет видимостью элементов главного окна. Пункты видимости — переключатели с галочкой: щёлкните повторно, чтобы вернуть скрытый элемент.</p>
+
+<table>
+    <tr><th>Пункт</th><th>Назначение</th></tr>
+    <tr><td>Панели → Вид</td><td>Показывает или скрывает тулбар над списком устройств: переключатель режима миниатюр, ползунок размера, фильтр «только онлайн», кнопки Veyon-фичей</td></tr>
+    <tr><td>Результаты выполнения</td><td>Показывает или скрывает таблицу результатов команд внизу окна</td></tr>
+    <tr><td>Панели</td><td>Подменю со списком пользовательских панелей (см. <a href="#custom-panels">Пользовательские панели</a>) - показ и скрытие каждой панели отдельно</td></tr>
+</table>
+
+<h2 id="custom-panels">Пользовательские панели</h2>
+<p>Собственные панели с кнопками частых команд - для действий, которые выполняются в один клик. Кнопка панели запускает свою команду на тех же отмеченных хостах, что кнопка <strong>Выполнить</strong> (включая хосты удалённых нод). Показ и скрытие каждой панели - галочками в подменю <strong>Вид - Панели</strong>, настройка - пункт <strong>Настроить панели...</strong> там же.</p>
+
+<div class="card-grid">
+    <div class="card">
+        <h4>Панели</h4>
+        <ul>
+            <li>Несколько именованных панелей сразу</li>
+            <li>Название в начале тулбара (галочка «Показывать название»)</li>
+            <li>Общий размер иконок: 16-64 px</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Кнопки</h4>
+        <ul>
+            <li>Каждая кнопка - команда из библиотеки</li>
+            <li>Выбор команды из дерева с иконками</li>
+            <li>Своя иконка у каждой кнопки</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h4>Редактор</h4>
+        <ul>
+            <li>Настройки панели и кнопок - в отдельных рамках</li>
+            <li>Кнопка «Применить» без закрытия окна</li>
+            <li>Двойной клик - смена команды кнопки</li>
+        </ul>
+    </div>
+</div>
+
+<h3>Как создать</h3>
+<ol class="steps">
+    <li>Откройте <strong>Вид - Панели - Настроить панели...</strong></li>
+    <li>Создайте панель: задайте название, размер иконок и галочку «Показывать название»</li>
+    <li>Добавьте кнопки: для каждой выберите команду из дерева и подберите иконку (есть поиск и предпросмотр)</li>
+    <li>Нажмите <strong>Применить</strong> - панели сохранятся без закрытия окна, <strong>ОК</strong> - сохранить и закрыть</li>
+    <li>Включите панель галочкой в <strong>Вид - Панели</strong></li>
+</ol>
+
+<h3>Источники иконок</h3>
+<table>
+    <tr><th>Источник</th><th>Что внутри</th></tr>
+    <tr><td>Набор</td><td>Около 1800 контурных значков - подстраиваются под тему (светлые на тёмной, тёмные на светлой)</td></tr>
+    <tr><td>Цветные</td><td>Около 500 значков с цветами по смыслу - видны на любой теме</td></tr>
+    <tr><td>Иконки темы</td><td>Значки из активного набора оформления</td></tr>
+    <tr><td>Свой файл</td><td>Любой SVG или PNG с диска</td></tr>
+</table>
+
+<div class="info-box">
+    Если команда кнопки удалена из библиотеки, клик предложит открыть редактор панелей и переназначить кнопку.
+</div>
+
+<!-- ============ ФАЙЛ ============ -->
+<h2 id="nodes">Несколько площадок: ноды</h2>
+<p>Нода — другой запущенный экземпляр DNO Tool со своим списком компьютеров. Подключение нод позволяет работать с устройствами нескольких площадок из одного окна.</p>
+<ol class="steps"><li>На подключаемом компьютере откройте <strong>Настройки → Данные → Ноды</strong> и получите ключ доступа и порт.</li><li>В том же окне на своём компьютере добавьте ноду: название, адрес, порт и её ключ доступа.</li><li>Сверьте отпечаток ключа с оператором площадки и проверьте соединение.</li><li>Включите отображение нод в главном окне. Отмечайте нужные устройства для выполнения команд.</li></ol>
+<p>Ключ доступа передавайте только тем, кому разрешено управление площадкой. Доступность устройств и миниатюры зависят от соединения с их нодой; настройки источника миниатюр задаются на ней.</p>
+<h2 id="troubleshooting">Если что-то не работает</h2>
+<table><tr><th>Ситуация</th><th>Что проверить</th></tr>
+<tr><td>Нет команд</td><td>Загрузите библиотеку в мастере или импортируйте commands.json через «Файл → Задачи». Программа и библиотека поставляются отдельно.</td></tr>
+<tr><td>Компьютер недоступен</td><td>Проверьте адрес, SSH-порт, сеть и включение компьютера. Статус доступности не подтверждает правильность логина и пароля.</td></tr>
+<tr><td>Отказ в SSH-доступе</td><td>Проверьте назначенную устройству связку, пароль или SSH-ключ. Для операций администратора проверьте настройку sudo и права пользователя.</td></tr>
+<tr><td>Нет изображения экрана</td><td>Проверьте выбранный источник миниатюр, работающий Veyon/VNC-сервер, порт и пароль. На другой источник программа автоматически не переключается.</td></tr>
+<tr><td>Ошибка видео</td><td>Откройте «Помощь → Инструменты → FFmpeg». Для камеры дополнительно проверьте адрес потока, учётные данные и свободное место.</td></tr>
+<tr><td>Команда ждёт ввода</td><td>Дважды нажмите на результат, прочитайте приглашение и отправьте ответ из поля ввода. Для приглашения нажать Enter отправьте пустую строку.</td></tr></table>
+<p>Для обращения за помощью укажите версию из «Помощь → О программе», систему, последовательность действий и текст ошибки. Перед отправкой журнала уберите пароли и другие закрытые данные.</p>
+<h2 id="export-import">Импорт и экспорт</h2>
+
+<p>Перед переносом на другой компьютер экспортируйте устройства и команды через меню «Файл». Это отдельные списки, а не полная резервная копия: учётные данные, SSH-ключи и другие настройки нужно перенести или настроить отдельно.</p>
+<p>Папка пользовательских данных: <code>%USERPROFILE%\.dno-tool</code> в Windows (вставьте путь в адресную строку Проводника), <code>~/.dno-tool</code> в Linux. Для резервной копии закройте программу и скопируйте эту папку в защищённое место. Исходники видеопроектов и записи камер сохраните отдельно: файл проекта не содержит сами видеозаписи.</p>
+<h3>Устройства</h3>
+<ul>
+    <li><strong>Экспорт</strong> - <strong>Файл - Хосты - Экспортировать список</strong> - сохранить список устройств в JSON-файл</li>
+    <li><strong>Импорт</strong> - <strong>Файл - Хосты - Импортировать список</strong> - загрузить устройства из JSON-файла</li>
+</ul>
+
+<h3>Команды</h3>
+<ul>
+    <li><strong>Экспорт</strong> - <strong>Файл - Задачи - Экспортировать команды</strong> - сохранить библиотеку команд в JSON-файл</li>
+    <li><strong>Импорт</strong> - <strong>Файл - Задачи - Импортировать команды</strong> - загрузить команды из JSON-файла (режимы Обновить/Заменить, см. <a href="#commands-editor">Редактор команд</a>)</li>
+    <li><strong>Обмен командами через Base64</strong> - в редакторе команд можно экспортировать/импортировать отдельные команды в виде текста (см. <a href="#commands-editor">Редактор команд</a>)</li>
+</ul>
+
+<!-- ============ ПОМОЩЬ ============ -->
+<h2 id="update">Обновление</h2>
+
+<p>Программа может проверять обновления через диалог <strong>Помощь - О программе</strong>. При открытии диалога проверка выполняется автоматически; если доступна новая версия, появляется кнопка «Обновить».</p>
+<ul>
+    <li>На <strong>Windows</strong> - скачивается zip-архив с новой версией в папку <code>Downloads</code></li>
+    <li>На <strong>Linux (RPM)</strong> - проверяется наличие новой версии на GitHub, показывается уведомление с подсказкой обновить пакет через менеджер пакетов</li>
+</ul>
+
+<p>Также можно отдельно обновить библиотеку команд - <code>commands.json</code> скачивается с последнего релиза на GitHub.</p>
+
+<div class="info-box warn">
+    <strong>Файл <code>commands.json</code> не входит в поставку!</strong> Он скачивается отдельно при установке или обновлении и хранится в <code>~/.dno-tool/commands.json</code>.
+</div>
+
+<hr style="margin-top:40px; border-color: var(--border);">
+<p style="color: var(--text-muted); font-size: 0.82rem; text-align:center;">
+    DNO Tool - Руководство пользователя<br>
+    Вопросы и предложения: <a href="https://github.com/xp9k/dno-tool">github.com/xp9k/dno-tool</a>
+</p>
+
+</main>
+
+<script>
+    const sections = document.querySelectorAll('h2[id], h3[id]');
+    const navLinks = document.querySelectorAll('.sidebar nav a');
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                navLinks.forEach(link => {
+                    link.classList.toggle('active',
+                        link.getAttribute('href') === '#' + entry.target.id);
+                });
+            }
+        });
+    }, { rootMargin: '-20% 0px -80% 0px' });
+    sections.forEach(s => observer.observe(s));
+    navLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            document.querySelector('.sidebar').classList.remove('open');
+        });
+    });
+</script>
+
+</body>
+</html>

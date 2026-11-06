@@ -1,0 +1,18 @@
+{
+  "av": {
+    "version": "19.0.2",
+    "url": "https://files.pythonhosted.org/packages/23/01/76b6bf563fe907597cf58f10d10168e93fe588b6db9f2658db87e87efa7e/av-19.0.2.tar.gz",
+    "sha256": "bebbc52598886480f4d861c575dc2b020785d6c04e1308680ddcc545e1b94c66",
+    "sha256_origin": "pypi-release-json"
+  },
+  "pyside": {
+    "version": "6.12.0",
+    "url": "https://mirrors.dotsrc.org/qtproject/official_releases/QtForPython/pyside6/PySide6-6.12.0-src/pyside-setup-everywhere-src-6.12.0.tar.xz",
+    "mirrors": [
+      "https://mirrors.ocf.berkeley.edu/qt/official_releases/QtForPython/pyside6/PySide6-6.12.0-src/pyside-setup-everywhere-src-6.12.0.tar.xz",
+      "https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.12.0-src/pyside-setup-everywhere-src-6.12.0.tar.xz"
+    ],
+    "sha256": "099c1a597cf33c1b000e11cf68a0b82d216fb802bf81726efc720394f10c7751",
+    "sha256_origin": "two-official-https-mirrors"
+  }
+}

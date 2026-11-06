@@ -1,0 +1,1685 @@
+:root {
+    --bg: #1e2228;
+    --bg-panel: #262b33;
+    --bg-elev: #2d333b;
+    --bg-hover: #353b44;
+    --border: #3a414b;
+    --text: #e4e7eb;
+    --text-dim: #9aa4b0;
+    --accent: #4a9eff;
+    --accent-hover: #6bb0ff;
+    --success: #2ecc71;
+    --danger: #e74c3c;
+    --warning: #f39c12;
+    --pending: #95a5a6;
+    --running: #3498db;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Единый размер и состояния выбора в деревьях, таблицах и формах. */
+input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    display: inline-grid;
+    place-content: center;
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    margin: 0;
+    vertical-align: middle;
+    border: 1px solid var(--text-dim);
+    border-radius: 5px;
+    background: var(--bg);
+    color: white;
+    cursor: pointer;
+}
+input[type="checkbox"]::before {
+    content: "";
+    width: 5px;
+    height: 9px;
+    border: solid currentColor;
+    border-width: 0 2px 2px 0;
+    transform: translateY(-1px) rotate(45deg) scale(0);
+}
+input[type="checkbox"]:checked, input[type="checkbox"]:indeterminate {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+input[type="checkbox"]:checked::before { transform: translateY(-1px) rotate(45deg) scale(1); }
+input[type="checkbox"]:indeterminate::before {
+    width: 8px;
+    height: 2px;
+    border: 0;
+    background: currentColor;
+    border-radius: 1px;
+    transform: none;
+}
+input[type="checkbox"]:hover:not(:disabled) { border-color: var(--accent-hover); }
+input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+input[type="checkbox"]:disabled { opacity: .45; cursor: default; }
+@media (forced-colors: active) {
+    input[type="checkbox"] { appearance: auto; -webkit-appearance: auto; }
+    input[type="checkbox"]::before { display: none; }
+}
+
+html, body {
+    height: 100%;
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+}
+
+/* Header */
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    height: 48px;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand .logo { font-size: 22px; }
+.brand h1 { font-size: 16px; font-weight: 600; }
+.version { color: var(--text-dim); font-weight: 400; font-size: 13px; }
+.auth-box { display: flex; align-items: center; gap: 10px; }
+.auth-status { color: var(--text-dim); font-size: 13px; }
+.auth-status.ok { color: var(--success); }
+
+/* Buttons */
+.btn {
+    padding: 6px 14px;
+    background: var(--bg-elev);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background .12s, border-color .12s;
+}
+.btn:hover { background: var(--bg-hover); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn-secondary { background: transparent; }
+.btn-small { padding: 4px 10px; font-size: 12px; }
+.btn-icon { padding: 4px 6px; line-height: 1; font-size: 22px; min-width: 40px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; }
+
+/* Layout */
+.main-layout {
+    display: grid;
+    grid-template-columns: 280px 6px 1fr;
+    gap: 0;
+    padding: 6px;
+    height: calc(100vh - 48px);
+}
+
+.panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.tree-panel { min-width: 240px; }
+.right-panel { display: flex; flex-direction: column; gap: 0; }
+
+/* Split-pane: верхняя (выбранные хосты) и нижняя (результаты) области,
+   разделённые перетаскиваемым горизонтальным разделителем. По умолчанию 50/50. */
+.split-pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 40px;
+    overflow: hidden;
+}
+#topPane { flex: 1 1 0; }
+#bottomPane { flex: 1 1 0; }
+.split-pane .device-list,
+.split-pane .results-area { flex: 1; min-height: 0; }
+
+.splitter {
+    flex: 0 0 6px;
+    background: var(--bg-elev);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    cursor: row-resize;
+    position: relative;
+}
+.splitter::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 3px;
+    background: var(--text-dim);
+    opacity: 0.4;
+    border-radius: 2px;
+}
+.splitter:hover::before { opacity: 0.8; }
+.splitter.dragging { background: var(--accent); }
+.splitter.dragging::before { opacity: 1; }
+
+/* Вертикальный разделитель между деревом хостов и правой панелью */
+.splitter-v {
+    background: var(--bg-elev);
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    cursor: col-resize;
+    position: relative;
+}
+.splitter-v::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 3px;
+    height: 40px;
+    background: var(--text-dim);
+    opacity: 0.4;
+    border-radius: 2px;
+}
+.splitter-v:hover::before { opacity: 0.8; }
+.splitter-v.dragging { background: var(--accent); }
+.splitter-v.dragging::before { opacity: 1; }
+
+/* Панель задач: combobox с выпадающим деревом */
+.command-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--bg-elev);
+    border-bottom: 1px solid var(--border);
+}
+.command-label { color: var(--text-dim); font-size: 13px; font-weight: 600; flex-shrink: 0; }
+
+/* Обёртка combobox + ℹ: на десктопе прозрачна (display: contents),
+   на мобильном — flex-строка, держит combobox+ℹ рядом. */
+.task-row { display: contents; }
+
+/* Combobox задач */
+.task-combobox {
+    position: relative;
+    flex: 1;
+    min-width: 180px;
+}
+.task-combobox-input {
+    width: 100%;
+    padding: 6px 28px 6px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.task-combobox-input:hover { border-color: var(--accent); }
+.task-combobox-input.placeholder { color: var(--text-dim); }
+.task-combobox-caret {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    pointer-events: none;
+    font-size: 12px;
+    transition: transform .12s;
+}
+.task-combobox.open .task-combobox-caret { transform: translateY(-50%) rotate(180deg); }
+
+/* Выпадающий popup */
+.task-popup {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    max-height: 360px;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.4);
+    z-index: 50;
+    overflow: hidden;
+}
+.task-popup.hidden { display: none; }
+.task-popup-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-elev);
+    flex-shrink: 0;
+}
+.task-popup-search { flex: 1; }
+.task-popup-search input {
+    width: 100%;
+    padding: 5px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 12px;
+}
+.task-popup-tree {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+    min-height: 120px;
+    background: var(--bg-panel);
+}
+.task-popup-tree .tree-item.task {
+    cursor: pointer;
+    padding-left: 12px;
+}
+.task-popup-tree .tree-item.task:hover { background: var(--bg-hover); }
+.task-popup-tree .tree-item.task.active {
+    background: rgba(74, 158, 255, .18);
+    border-left: 3px solid var(--accent);
+    padding-left: 9px;
+}
+.task-popup-tree .tree-item.task .icon { color: var(--accent); }
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-elev);
+    min-height: 34px;
+}
+.panel-header h2 { font-size: 13px; font-weight: 600; flex: 0 0 auto; }
+.panel-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* Группа кнопок в panel-header (замена .panel-actions для #topPane) */
+.header-group { display: flex; gap: 4px; align-items: center; flex: 0 0 auto; }
+.header-actions { margin-left: auto; justify-content: flex-end; }
+/* Десктоп: кнопки шапки #topPane в одну строку (панель Veyon раскрывается inline справа) */
+#topPane .panel-header { flex-wrap: nowrap; }
+
+.panel-footer {
+    padding: 6px 10px;
+    border-top: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 12px;
+    background: var(--bg-elev);
+}
+
+/* Tree */
+.tree-search { padding: 8px; border-bottom: 1px solid var(--border); }
+.tree-search input {
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 13px;
+}
+.tree-view {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+    user-select: none;
+}
+.tree-item {
+    display: flex;
+    align-items: center;
+    padding: 3px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.tree-item:hover { background: var(--bg-hover); }
+.tree-item.folder { font-weight: 600; }
+.tree-item .caret { margin-right: 4px; width: 14px; text-align: center; color: var(--text-dim); transition: transform .12s; }
+.tree-item.collapsed .caret { transform: rotate(-90deg); }
+.tree-item .icon { margin-right: 6px; }
+.tree-view .tree-item .icon.icon-svg { display: inline-flex; align-items: center; justify-content: center; }
+.tree-view .tree-item .icon-svg img.status-icon-img { width: 16px; height: 16px; object-fit: contain; display: block; }
+.tree-item .label { overflow: hidden; text-overflow: ellipsis; }
+.tree-item .host { color: var(--text-dim); font-size: 12px; margin-left: 6px; }
+.tree-children { margin-left: 18px; display: block; }
+.tree-children.hidden { display: none; }
+.tree-item.match { background: rgba(74, 158, 255, .15); }
+.tree-item input[type="checkbox"] {
+    margin-right: 6px;
+    cursor: pointer;
+    accent-color: var(--accent);
+}
+.tree-item input[type="checkbox"]:indeterminate {
+    accent-color: var(--warning);
+}
+
+/* Командная панель — стили выше в секции .command-panel */
+
+/* Device list */
+.device-list {
+    overflow-y: auto;
+    padding: 4px 0;
+    min-height: 60px;
+}
+
+/* Переключатель режимов отображения */
+.view-mode-switch {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-right: 6px;
+}
+.view-btn {
+    padding: 4px 6px;
+    background: var(--bg);
+    color: var(--text-dim);
+    border: none;
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 22px;
+    line-height: 1;
+    min-width: 40px;
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.view-btn:last-child { border-right: none; }
+.view-btn:hover { background: var(--bg-hover); color: var(--text); }
+.view-btn.active { background: var(--accent); color: #fff; }
+
+/* Блок Veyon-фичей: инлайн в шапке справа от тумблера (та же строка, nowrap).
+   Скрыт по умолчанию, раскрывается по .open (тумблер #vfeatToggle).
+   10 кнопок — horizontal scroll внутри блока если не влезают. */
+.veyon-features {
+    display: none;
+    gap: 2px;
+    margin-right: 8px;
+    padding: 0;
+    flex: 0 1 auto;
+    overflow-x: auto;
+}
+.veyon-features.open { display: inline-flex; }
+/* Блок Управление (питание/сессия): всегда доступен, не зависит от Veyon.
+   Структура и поведение идентичны .veyon-features. 5 кнопок. */
+.ctrl-features {
+    display: none;
+    gap: 2px;
+    margin-right: 8px;
+    padding: 0;
+    flex: 0 1 auto;
+    overflow-x: auto;
+}
+.ctrl-features.open { display: inline-flex; }
+/* Тумблеры панелей: стандартный размер .btn-icon */
+#vfeatToggle img, #ctrlToggle img { width: 26px; height: 26px; object-fit: contain; display: block; }
+.vfeat-btn {
+    padding: 4px 6px;
+    background: var(--bg);
+    color: var(--text-dim);
+    border: none;
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    line-height: 1;
+    min-width: 34px;
+    min-height: 30px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.vfeat-btn img {
+    width: 26px;
+    height: 26px;
+    display: block;
+}
+.vfeat-btn:last-child { border-right: none; }
+.vfeat-btn:hover { background: var(--bg-hover); color: var(--text); }
+.vfeat-btn:active { transform: scale(0.96); }
+.vfeat-sep {
+    flex: 0 0 auto;
+    width: 1px;
+    align-self: stretch;
+    margin: 4px 3px;
+    background: var(--border);
+}
+.vfeat-btn.vfeat-loading {
+    opacity: 0.5;
+    pointer-events: none;
+    animation: vfeat-pulse 0.8s ease-in-out infinite;
+}
+@keyframes vfeat-pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.85; }
+}
+
+/* Кнопка группировки по папкам (рядом с переключателем режимов) */
+#groupBtn.active, #onlineOnlyBtn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* Иконка фильтра "только онлайн" (инлайн-SVG зеленый монитор) */
+#onlineOnlyBtn svg { width: 22px; height: 22px; display: block; }
+
+/* Общие правила для device-item и кнопки удаления (унифицированы) */
+.device-item { position: relative; }
+.device-item .remove {
+    position: absolute;
+    top: 4px;
+    right: 5px;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    background: rgba(30, 34, 40, .7);
+    border: none;
+    border-radius: 3px;
+    opacity: 0;
+    transition: opacity .12s, color .12s;
+    z-index: 5;
+}
+.device-item:hover .remove { opacity: .85; }
+.device-item .remove:hover { color: var(--danger); opacity: 1; background: rgba(231, 76, 60, .15); }
+
+/* Режим: список.
+   Без группировки — горизонтальная лента с переносом (как в grouped-режиме):
+   карточки «🖥 описание» укладываются слева направо с переносом по заполнению,
+   а не в один вертикальный столбик. */
+.device-list.mode-list:not(.grouped) {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    padding: 6px 10px;
+    align-content: flex-start;
+}
+.device-list.mode-list .device-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    font-size: 13px;
+    flex: 0 0 auto;
+}
+.device-list.mode-list .device-item:hover { background: var(--bg-hover); }
+.device-list.mode-list .device-item .icon { font-size: 16px; flex-shrink: 0; }
+.device-list.mode-list .device-item .icon.icon-svg { display: flex; align-items: center; justify-content: center; }
+.device-list.mode-list .device-item .icon-svg img.status-icon-img {
+    width: 14px;
+    height: 14px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+.device-list.mode-list .device-item .name { font-weight: 500; }
+.device-list.mode-list .device-item .host { color: var(--text-dim); margin-left: 6px; font-size: 12px; }
+
+/* Режим: иконки */
+.device-list.mode-icons,
+.device-list.mode-icons.grouped .group-body {
+    padding: 8px;
+    display: grid;
+    grid-template-columns: var(--icon-columns, repeat(auto-fill, 90px));
+    gap: 8px;
+    align-content: start;
+}
+.device-list.mode-icons .device-item {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 4px 8px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    text-align: center;
+}
+.device-list.mode-icons .device-item:hover { background: var(--bg-hover); border-color: var(--accent); }
+.device-list.mode-icons .device-item .icon { font-size: 30px; }
+.device-list.mode-icons .device-item .icon.icon-svg {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--device-icon-size, 48px);
+    max-width: 100%;
+    aspect-ratio: 1;
+    flex: none;
+    font-size: var(--device-icon-size, 48px);
+}
+.device-list.mode-icons .device-item .icon-svg img.status-icon-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.device-list.mode-icons .device-item .name {
+    font-size: 12px;
+    font-weight: 500;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.device-list.mode-icons .device-item .host { display: none; }
+
+/* Миниатюры: одинаковая сетка внутри и вне групп. Ползунок задаёт
+   ширину ячейки и квадратную область изображения; кадр вписывается
+   в неё с сохранением своих пропорций. */
+.device-list.mode-thumbs,
+.device-list.mode-thumbs.grouped .group-body {
+    padding: 8px;
+    display: grid;
+    grid-template-columns: var(--thumbnail-columns, repeat(3, minmax(0, 1fr)));
+    grid-auto-rows: minmax(min-content, auto);
+    gap: 10px;
+    align-content: start;
+}
+.device-list.mode-thumbs .device-item {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.device-list.mode-thumbs .device-item:hover { border-color: var(--accent); }
+.device-list.mode-thumbs .thumb-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    flex-shrink: 0;
+    min-height: 64px;
+    background: var(--bg);
+    overflow: hidden;
+}
+.device-list.mode-thumbs .thumb-wrap img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.device-list.mode-thumbs .thumb-wrap > .thumb-theme-layer { object-fit: fill; pointer-events: none; }
+.device-list.mode-thumbs .thumb-underlay { z-index: 0; }
+.device-list.mode-thumbs .thumb-overlay { z-index: 2; }
+.device-list.mode-thumbs .thumb-wrap:not(.monitor-frame) > .thumb-theme-layer,
+.device-list.mode-thumbs .thumb-wrap:has(.is-placeholder) > .thumb-theme-layer { display: none; }
+.device-list.mode-thumbs .thumb-wrap.monitor-frame > .thumb-img:not(.is-placeholder) {
+    left: var(--thumb-screen-left); top: var(--thumb-screen-top);
+    width: var(--thumb-screen-width); height: var(--thumb-screen-height);
+    object-fit: cover; z-index: 1;
+}
+.device-list.mode-thumbs .thumb-refresh {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    background: rgba(0,0,0,.5);
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 3px;
+    cursor: pointer;
+    line-height: 0;
+    opacity: 0;
+    transition: opacity .12s;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.device-list.mode-thumbs .device-item:hover .thumb-refresh { opacity: 1; }
+.device-list.mode-thumbs .thumb-refresh:hover { background: rgba(0,0,0,.8); }
+/* Действия с хостом: сведения, терминал, файлы, VNC */
+.device-item .host-actions {
+    display: flex;
+    gap: 3px;
+    opacity: 0;
+    transition: opacity .12s;
+    z-index: 5;
+}
+.device-item:hover .host-actions, .device-item .host-actions:focus-within { opacity: 1; }
+.host-action {
+    background: rgba(0,100,200,.7);
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 3px;
+    cursor: pointer;
+    line-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.host-action:hover { background: rgba(0,100,200,1); }
+/* На маленьких миниатюрах кнопки переносятся и не наезжают на «Обновить» слева. */
+.device-list.mode-thumbs .host-actions { position: absolute; top: 4px; right: 4px; left: 28px; flex-wrap: wrap; justify-content: flex-end; }
+.device-list.mode-icons .host-actions { position: absolute; top: 4px; left: 4px; right: 26px; flex-wrap: wrap; }
+/* В списке кнопки появляются поверх имени на плотном фоне и не раздвигают карточку. */
+.device-list.mode-list .host-actions {
+    position: absolute;
+    top: 50%;
+    right: 26px;
+    transform: translateY(-50%);
+    padding: 2px;
+    border-radius: 4px;
+    background: var(--bg-hover);
+    pointer-events: none;
+}
+.device-list.mode-list .host-action { background: rgb(0,100,200); }
+.device-list.mode-list .host-action:hover { background: rgb(0,120,230); }
+.device-list.mode-list .device-item:hover .host-actions,
+.device-list.mode-list .host-actions:focus-within { pointer-events: auto; }
+@media (hover: none) {
+    .device-item .host-actions { opacity: 1; }
+    .device-list.mode-list .host-actions { position: static; transform: none; pointer-events: auto; margin-left: 6px; }
+}
+.device-list.mode-thumbs .thumb-label {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    font-size: 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.device-list.mode-thumbs .thumb-label .name {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+/* remove в миниатюрах — поверх label справа */
+.device-list.mode-thumbs .device-item .remove {
+    top: auto;
+    bottom: 5px;
+    right: 5px;
+}
+
+.empty-state {
+    color: var(--text-dim);
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+}
+/* В grid-режимах (иконки/миниатюры) empty-state должен занимать всю строку,
+   а не одну grid-ячейку (иначе выглядит как иконка). */
+.device-list.mode-icons .empty-state,
+.device-list.mode-thumbs .empty-state {
+    grid-column: 1 / -1;
+}
+
+/* Группировка выбранных устройств по родительским папкам.
+   Карточки устройств строятся теми же стилями, что и без группировки
+   (mode-list/icons/thumbs) — отличается только наличие заголовков групп.
+   Группы идут вертикально; .group-body оборачивает устройства группы.
+   Важно: блок расположен после секций mode-icons/mode-thumbs и использует
+   !important для display, т.к. при равной специфичности (0,2,0) правило
+   .device-list.mode-icons { display: grid } иначе переопределяло grouped-
+   раскладку и все три режима в группе выглядели одинаково (сломанно). */
+.device-list.grouped {
+    padding: 4px 0;
+    display: block !important;
+    grid-template-columns: none !important;
+    gap: 0 !important;
+}
+.group-block {
+    margin: 0;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+}
+.group-block:last-child { border-bottom: none; }
+.group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    user-select: none;
+    font-size: 12px;
+    font-weight: 600;
+}
+.group-header:hover { background: var(--bg-hover); }
+.group-name { color: var(--text); flex: 0 0 auto; }
+.group-count {
+    flex: 0 0 auto;
+    color: var(--text-dim);
+    font-weight: 500;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 11px;
+}
+.group-line {
+    flex: 1 1 auto;
+    height: 0;
+    border-top: 1px solid var(--border);
+}
+.group-block.collapsed .group-body { display: none !important; }
+
+/* Список внутри группы — лента с переносом. Режимы иконок и миниатюр
+   используют свои сетки, заданные выше более точными селекторами. */
+.group-body {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 10px;
+}
+/* В режиме list карточки имеют ширину по контенту (Вариант A):
+    компактная горизонтальная лента «🖥 описание» с переносом по заполнению. */
+.device-list.mode-list.grouped .device-item { flex: 0 0 auto; }
+
+/* Results */
+.results-area {
+    overflow-y: auto;
+    padding: 8px;
+    background: var(--bg);
+}
+.result-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--pending);
+    border-radius: 4px;
+    margin-bottom: 8px;
+    overflow: hidden;
+}
+.result-card.success { border-left-color: var(--success); }
+.result-card.error { border-left-color: var(--danger); }
+.result-card.running { border-left-color: var(--running); }
+.result-card.pending { border-left-color: var(--pending); }
+.result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--bg-elev);
+    cursor: pointer;
+    user-select: none;
+}
+.result-header h3 { font-size: 13px; font-weight: 600; }
+.result-header .status-badge {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+.badge-pending { background: var(--pending); color: #fff; }
+.badge-running { background: var(--running); color: #fff; }
+.badge-success { background: var(--success); color: #fff; }
+.badge-error { background: var(--danger); color: #fff; }
+
+/* Единый бейдж задания в заголовке «Результаты выполнения» */
+.jobs-badge-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+    margin-right: auto;
+}
+
+.jobs-badge {
+    display: inline-flex;
+    align-items: stretch;
+    border-radius: 11px;
+    overflow: hidden;
+}
+/* Цвет по статусу — на контейнере */
+.jobs-badge.status-idle    { background: var(--bg-panel); color: var(--text-dim); }
+.jobs-badge.status-running { background: var(--running); color: #fff; }
+.jobs-badge.status-done    { background: var(--success); color: #fff; }
+.jobs-badge.status-error   { background: var(--danger); color: #fff; }
+
+.badge-label {
+    display: inline-flex;
+    align-items: center;
+    max-width: 220px;
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 18px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: none;
+    color: inherit;
+}
+
+.badge-clock {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+    border: none;
+    border-left: 1px solid rgba(255, 255, 255, 0.25);
+    background: transparent;
+    color: inherit;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+}
+.badge-clock:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+.badge-clock.hidden, .badge-label.hidden { display: none; }
+
+/* Обёртка кнопки «Выполнить» + dropdown-панель активных заданий */
+.execute-wrap {
+    position: relative;
+    display: inline-block;
+}
+
+.active-jobs-panel {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    min-width: 260px;
+    max-width: 360px;
+    background: var(--panel, #1e2228);
+    border: 1px solid var(--border, #2d323b);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    z-index: 1000;
+    padding: 6px 0;
+}
+.active-jobs-panel.hidden { display: none; }
+
+.active-jobs-empty {
+    padding: 10px 12px;
+    color: var(--text-dim, #9aa4b0);
+    font-size: 13px;
+}
+
+.active-job-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border, #2d323b);
+}
+.active-job-item:last-child { border-bottom: none; }
+.active-job-item:hover {
+    background: var(--hover, #2a2f38);
+}
+.active-job-item.active {
+    background: var(--primary-dim, rgba(41, 128, 185, 0.18));
+    border-left: 3px solid var(--primary, #2980b9);
+    padding-left: 9px;
+}
+
+.active-job-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text, #e1e4e8);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.active-job-meta {
+    font-size: 11px;
+    color: var(--text-dim, #9aa4b0);
+    margin-top: 2px;
+}
+
+/* Подзаголовки секций внутри панели заданий */
+.active-jobs-section-header {
+    padding: 6px 12px 3px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim, #9aa4b0);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-top: 1px solid var(--border, #2d323b);
+}
+.active-jobs-section-header:first-child {
+    border-top: none;
+}
+
+/* Завершённые задания — приглушенный стиль */
+.active-job-item.recent {
+    opacity: 0.75;
+}
+.active-job-item.recent:hover {
+    opacity: 1;
+}
+
+/* Цветной индикатор статуса завершённого задания */
+.recent-status {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+}
+.recent-status-finished { background: var(--success, #2ecc71); }
+.recent-status-aborted  { background: var(--pending, #f39c12); }
+.recent-status-error    { background: var(--danger, #e74c3c); }
+.result-body {
+    padding: 10px 12px;
+    font-family: "Cascadia Code", "Consolas", "Menlo", monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 320px;
+    overflow-y: auto;
+    background: var(--bg);
+    color: var(--text);
+    display: none;
+}
+.result-card.expanded .result-body { display: block; }
+
+/* Modal */
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+.modal.hidden { display: none; }
+.modal-content {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    min-width: 360px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+.modal-wide { min-width: 560px; }
+.modal-content h2 { margin-bottom: 16px; font-size: 16px; }
+.modal-content form { display: flex; flex-direction: column; gap: 10px; }
+.modal-content label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--text-dim);
+}
+.modal-content label.checkbox { flex-direction: row; align-items: center; gap: 8px; }
+.modal-content input[type="text"],
+.modal-content input[type="password"],
+.modal-content input[type="number"] {
+    padding: 7px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 13px;
+}
+.modal-content fieldset {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.modal-content legend { padding: 0 6px; color: var(--accent); font-weight: 600; font-size: 13px; }
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+/* VNC Modal (удалённый рабочий стол) */
+.modal-fullscreen {
+    width: 96vw;
+    height: 92vh;
+    min-width: 0;
+    max-width: 96vw;
+    max-height: 92vh;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.vnc-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+}
+.vnc-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.vnc-features {
+    display: flex;
+    gap: 4px;
+}
+.vnc-feature-btn {
+    font-size: 16px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+.vnc-feature-btn:hover {
+    opacity: 1;
+}
+.vnc-canvas-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    overflow: hidden;
+    min-height: 0;
+}
+#vncCanvas {
+    max-width: 100%;
+    max-height: 100%;
+    image-rendering: pixelated;
+    cursor: default;
+}
+.vnc-status {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #fff;
+    font-size: 16px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 12px 24px;
+    border-radius: 8px;
+    z-index: 10;
+}
+
+/* Task info */
+.task-info-dialog { width: 720px; min-width: 0; overflow-wrap: anywhere; }
+.task-info-body { font-size: 13px; line-height: 1.6; }
+.task-info-body .field { margin-bottom: 10px; }
+.task-info-body .field-label { color: var(--text-dim); font-weight: 600; }
+.task-info-body pre {
+    background: var(--bg);
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    overflow-x: auto;
+    margin-top: 4px;
+    font-size: 12px;
+    white-space: pre-wrap;
+}
+.task-info-body .param { display: inline-block; background: var(--bg-elev); padding: 2px 8px; border-radius: 10px; margin: 2px; font-size: 12px; }
+
+/* Список команд в информации о задаче: тип команды отдельным бейджем,
+   текст команды — на следующей строке моноширинным шрифтом. */
+.task-info-body .command-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+}
+.task-info-body .command-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 10px;
+}
+.task-info-body .command-type-badge {
+    display: inline-block;
+    align-self: flex-start;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+.task-info-body .command-text {
+    font-family: "Cascadia Code", "Consolas", "Menlo", monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text);
+    user-select: text;
+    -webkit-user-select: text;
+}
+.command-mode-icons { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.command-mode-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 26px; border-radius: 5px; background: #ffffff10; }
+.command-mode-icon .app-icon { width: 22px; height: 22px; }
+.command-mode-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.command-text .syntax-keyword { color: #82aaff; font-weight: 600; }
+.command-text .syntax-command { color: #c792ea; }
+.command-text .syntax-comment { color: #91a4ae; font-style: italic; }
+.command-text .syntax-string { color: #b5d68a; }
+.command-text .syntax-variable, .command-text .syntax-number { color: #f6ad82; }
+.command-text .syntax-operator { color: #e5c07b; }
+.command-text .syntax-parameter { color: #80deea; font-weight: 600; }
+
+/* ssh / local — терминальный блок кода */
+.task-info-body .command-row-terminal {
+    background: #14171c;
+    border-color: #2a3038;
+    border-radius: 6px;
+    padding: 0;
+    overflow: hidden;
+}
+.task-info-body .terminal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    background: #1c2128;
+    border-bottom: 1px solid #2a3038;
+}
+.task-info-body .terminal-dots {
+    color: #4b525c;
+    font-size: 10px;
+    letter-spacing: 2px;
+}
+.task-info-body .command-row-terminal .command-text {
+    display: block;
+    padding: 10px 12px;
+    color: #d6deeb;
+    font-size: 13px;
+    line-height: 1.5;
+}
+.task-info-body .terminal-prompt {
+    color: var(--success);
+    font-weight: 700;
+    margin-right: 4px;
+}
+
+/* sftp-команда: Что / Откуда / Куда */
+.task-info-body .command-row-sftp { gap: 8px; }
+.task-info-body .sftp-transfer {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.task-info-body .sftp-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 6px 8px;
+    background: var(--bg-elev);
+    border-radius: 4px;
+    border-left: 3px solid var(--accent);
+}
+.task-info-body .sftp-field-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: .4px;
+}
+.task-info-body .sftp-side-tag {
+    align-self: flex-start;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
+}
+.task-info-body .sftp-arrow {
+    text-align: center;
+    font-size: 16px;
+    color: var(--text-dim);
+    line-height: 1;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--bg-hover); }
+
+.hidden { display: none !important; }
+
+/* Toasts */
+.toast-container {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+    max-width: 360px;
+}
+.toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--text-dim);
+    border-radius: 6px;
+    padding: 10px 12px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+    color: var(--text);
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    font-size: 13px;
+}
+.toast.show { opacity: 1; transform: translateX(0); }
+.toast.error { border-left-color: var(--danger); }
+.toast.success { border-left-color: var(--success); }
+.toast.info { border-left-color: var(--accent); }
+.toast.warn { border-left-color: var(--warning); }
+.toast-body { flex: 1; min-width: 0; }
+.toast-title { font-weight: 600; margin-bottom: 2px; }
+.toast-text { color: var(--text-dim); white-space: normal; word-wrap: break-word; }
+.toast-actions { display: flex; gap: 6px; margin-top: 6px; }
+.toast-actions .btn { padding: 3px 10px; font-size: 12px; }
+.toast-close {
+    background: none; border: none; color: var(--text-dim);
+    cursor: pointer; font-size: 16px; line-height: 1; padding: 0;
+    margin-left: 4px;
+}
+.toast-close:hover { color: var(--text); }
+
+/* ===== Responsive / Mobile ===== */
+
+/* Кнопка-бургер и тумблер Veyon-фичей — скрыты на десктопе */
+.menu-toggle { display: none; }
+.task-popup-close { display: none; }
+.drawer-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .55);
+    z-index: 40;
+    opacity: 0;
+    transition: opacity .18s ease;
+}
+.drawer-overlay.show { display: block; opacity: 1; }
+.drawer-close { display: none; }
+
+/* Компактные иконки управления в заголовке списка на средних экранках,
+   чтобы весь набор кнопок влезал без горизонтального скролла. */
+@media (max-width: 1100px) {
+    .vfeat-btn { min-width: 34px; min-height: 30px; }
+    .vfeat-btn img { width: 22px; height: 22px; }
+    .view-btn { min-width: 34px; min-height: 30px; font-size: 18px; }
+    .panel-actions .btn-icon { min-width: 34px; min-height: 30px; font-size: 18px; }
+}
+
+/* Точка перехода: 820px и меньше — мобильная раскладка */
+@media (max-width: 820px) {
+    html, body { overflow-x: hidden; overflow-y: auto; }
+    body { height: auto; }
+
+    /* Header */
+    .app-header { padding: 6px 10px; }
+    .brand h1 { font-size: 14px; }
+    .auth-status { display: none; }
+    .menu-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        font-size: 18px;
+    }
+
+    /* Off-canvas drawer для дерева хостов */
+    .main-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 6px;
+        height: auto;
+        min-height: calc(100vh - 48px);
+    }
+    .tree-panel {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: min(86vw, 340px);
+        z-index: 50;
+        transform: translateX(-100%);
+        transition: transform .22s ease;
+        border-radius: 0;
+        border-left: none;
+        max-height: 100vh;
+    }
+    .tree-panel.open {
+        transform: translateX(0);
+        box-shadow: 4px 0 24px rgba(0,0,0,.5);
+    }
+    .drawer-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Скрыть вертикальный разделитель — бесполезен в column-layout */
+    .splitter-v { display: none; }
+
+    /* Правая панель — колонка, без фиксированной высоты */
+    .right-panel {
+        flex: 1 1 auto;
+        min-height: 0;
+        width: 100%;
+    }
+
+    /* command-bar — wrap для тача */
+    .command-bar {
+        flex-wrap: wrap;
+        padding: 8px;
+        gap: 6px;
+    }
+    .command-label { width: 100%; }
+    /* Строка combobox + ℹ: всегда вместе, переносятся парой.
+       .task-row на десктопе display:contents; здесь — flex-строка. */
+    .task-row {
+        display: flex;
+        gap: 6px;
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+    .task-row .task-combobox {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .task-row #taskInfoBtn {
+        flex: 0 0 auto;
+    }
+    /* Выполнить/Отменить — на всю строку. #executeBtn обёрнут в .execute-wrap,
+       поэтому flex применяется к обёртке, а ширину кнопки задаём через width:100%. */
+    .execute-wrap {
+        flex: 1 1 100%;
+        display: block;
+    }
+    #executeBtn {
+        width: 100%;
+        min-height: 44px;
+        font-size: 15px;
+        font-weight: 600;
+    }
+    #abortBtn {
+        flex: 1 1 100%;
+        min-height: 44px;
+        font-size: 15px;
+        font-weight: 600;
+    }
+    .task-combobox-input {
+        padding: 10px 28px 10px 12px;
+        font-size: 15px;
+        min-height: 40px;
+    }
+    .command-bar .btn {
+        padding: 9px 14px;
+        font-size: 14px;
+        min-height: 38px;
+    }
+    .command-bar .btn-icon { min-height: 38px; min-width: 38px; }
+
+    /* task-popup → fullscreen overlay на мобильном */
+    .task-popup {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-height: 100vh;
+        height: 100vh;
+        /* dvh учитывает видимые панели мобильного браузера. */
+        max-height: 100dvh;
+        height: 100dvh;
+        border-radius: 0;
+        border: none;
+        z-index: 200;
+    }
+    .task-popup-bar { padding: 8px 10px; }
+    .task-popup-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+    }
+    .task-popup-search input {
+        padding: 9px 10px;
+        font-size: 15px;
+        min-height: 38px;
+    }
+    .task-popup-tree {
+        max-height: none;
+        flex: 1 1 0;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior-y: contain;
+        padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+    /* Увеличенные пункты дерева под палец */
+    .task-popup-tree .tree-item,
+    .task-popup-tree .tree-item.task { padding: 10px 12px; font-size: 15px; }
+    .task-popup-tree .tree-item.task.active { padding-left: 9px; }
+
+    /* split-pane — вертикальная колонка, без drag.
+       overflow: hidden — чтобы содержимое не вылезало и не наезжало
+       на соседние блоки; высота #topPane ограничена max-height. */
+    .split-pane { min-height: 200px; overflow: hidden; }
+    #topPane, #bottomPane {
+        flex: 0 0 auto;
+    }
+    #topPane {
+        flex: 1 1 auto;
+        min-height: 200px;
+        max-height: 70vh;
+        overflow: hidden;
+    }
+    #bottomPane { max-height: 40vh; }
+    .splitter { display: none; }
+
+    /* Заголовки панелей крупнее, кнопки под палец.
+       flex: 0 0 auto — высота по содержимому, не сжимается (растёт
+       когда Veyon-панель раскрыта в несколько строк). */
+    .panel-header { flex: 0 0 auto; min-height: 40px; padding: 8px 10px; }
+    .panel-header h2 { font-size: 14px; }
+    .panel-actions .btn-icon { min-width: 40px; min-height: 36px; font-size: 22px; }
+
+    /* Мобильная шапка «Выбранные устройства»: кнопки на одной строке,
+       Veyon-панель — отдельным скрываемым блоком под ними (перенос flex-wrap). */
+    #topPane .panel-header { flex-wrap: wrap; }
+    .header-actions {
+        display: flex;
+        flex: 1 1 100%;
+        gap: 4px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-left: auto;
+    }
+    /* Единый размер для всех кнопок группы на мобильном */
+    .header-actions .btn-icon,
+    .header-actions .view-btn {
+        min-width: 34px;
+        min-height: 32px;
+        padding: 4px 6px;
+        font-size: 18px;
+    }
+    /* Единообразие: view-mode-switch как отдельные кнопки, без рамки-группы */
+    #topPane .view-mode-switch {
+        border: none;
+        border-radius: 0;
+        overflow: visible;
+        margin: 0;
+    }
+    #topPane .view-mode-switch .view-btn {
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        margin-left: 2px;
+    }
+    #topPane .view-mode-switch .view-btn:first-child { margin-left: 0; }
+
+    /* #selectedList честно занимает остаток #topPane под panel-header */
+    #selectedList {
+        flex: 1 1 auto;
+        min-height: 80px;
+        overflow-y: auto;
+    }
+
+    /* Дерево хостов внутри drawer — крупные тач-цели */
+    .tree-item { padding: 8px 10px; font-size: 14px; }
+    .tree-item input[type="checkbox"] { width: 18px; height: 18px; }
+    .tree-search input { padding: 9px 10px; font-size: 15px; }
+
+    /* Панели управления (Veyon + Управление) на мобильном: скрываемые панели
+       отдельной строкой под header. Без рамки/закругления — нейтральный блок,
+       не выбивается из стиля. Блоки кнопок (между разделителями) равномерно
+       распределяются по ширине, разделители растягиваются динамически
+       (невидимые spacer'ы). */
+    .veyon-features, .ctrl-features {
+        position: static;
+        flex: 1 1 100%;
+        flex-basis: 100%;
+        width: 100%;
+        order: 99;
+        justify-content: flex-start;
+        align-items: center;
+        flex-wrap: wrap;
+        margin: 4px 0 0;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        overflow: visible;
+        display: none;
+    }
+    .veyon-features.open, .ctrl-features.open { display: flex; }
+    .vfeat-btn {
+        flex: 0 0 auto;
+        min-width: 34px;
+        min-height: 32px;
+        border-right: none;
+    }
+    .vfeat-btn img { width: 18px; height: 18px; }
+    #vfeatToggle img, #ctrlToggle img { width: 18px; height: 18px; }
+    /* Разделители — невидимые растягивающиеся spacer'ы: блоки кнопок
+       равномерно распределяются по ширине, видимых линий нет. */
+    .vfeat-sep {
+        flex: 1 1 auto;
+        width: auto;
+        height: 1px;
+        margin: 0 4px;
+        background: transparent;
+    }
+    .vfeat-sep::before { content: none; }
+
+    /* Список устройств: меньше колонок в grid-режимах */
+    .device-list.mode-icons,
+    .device-list.mode-icons.grouped .group-body {
+        grid-template-columns: var(--icon-columns, repeat(auto-fill, 80px));
+        gap: 6px;
+    }
+    /* Миниатюры: две колонки, если ширина не задана в настройках. */
+    .device-list.mode-thumbs,
+    .device-list.mode-thumbs.grouped .group-body {
+        gap: 8px;
+        grid-template-columns: var(--thumbnail-columns, repeat(2, minmax(0, 1fr)));
+    }
+    .device-list.mode-thumbs .thumb-wrap { min-height: 72px; }
+    .device-list.mode-list .device-item { padding: 9px 12px; font-size: 14px; }
+
+    /* Результаты — карточки с раскрытием по тапу */
+    .result-header { padding: 10px 12px; }
+    .result-header h3 { font-size: 14px; }
+    .result-body { font-size: 12px; max-height: 60vh; }
+    .result-card.expanded .result-body { display: block; }
+
+    /* Модальные окна — fullscreen на мобильном */
+    .modal-content {
+        min-width: 0;
+        width: 94vw;
+        max-width: 94vw;
+        max-height: 92vh;
+        padding: 16px;
+        margin: auto;
+    }
+    .modal-wide { min-width: 0; }
+    .modal-content input[type="text"],
+    .modal-content input[type="password"],
+    .modal-content input[type="number"] {
+        padding: 10px 12px;
+        font-size: 15px;
+    }
+    .modal-actions .btn { padding: 10px 16px; font-size: 14px; min-height: 40px; }
+
+    /* Тосты — по всей ширине сверху */
+    .toast-container {
+        top: 6px;
+        right: 6px;
+        left: 6px;
+        max-width: none;
+    }
+}
+
+/* Очень узкие экраны (<480px): ещё компактнее */
+@media (max-width: 480px) {
+    .brand .logo { display: none; }
+    .view-mode-switch .view-btn { padding: 5px 10px; font-size: 14px; }
+    .vfeat-btn { min-width: 32px; min-height: 30px; }
+    .vfeat-btn img { width: 18px; height: 18px; }
+    .device-list.mode-icons,
+    .device-list.mode-icons.grouped .group-body {
+        grid-template-columns: var(--icon-columns, repeat(auto-fill, 72px));
+    }
+    /* Миниатюры: тот же размер колонок, чуть меньше зазор. */
+    .device-list.mode-thumbs,
+    .device-list.mode-thumbs.grouped .group-body {
+        gap: 6px;
+    }
+    .device-list.mode-thumbs .thumb-wrap { min-height: 64px; }
+}
+
+/* ===== Custom tooltip ===== */
+#dnoTooltip {
+    position: fixed; z-index: 10000; max-width: 240px; padding: 6px 10px;
+    background: rgba(22, 33, 62, 0.97); color: #e0e0e0;
+    border: 1px solid #0f3460; border-radius: 6px;
+    box-shadow: 3px 3px 0px rgba(0,0,0,0.5); font-size: 12px; line-height: 1.4;
+    white-space: pre-line; text-align: left; pointer-events: none;
+    opacity: 0; transition: opacity 0.15s ease-in-out;
+}
+#dnoTooltip:not(.hidden) { opacity: 1; }
+#dnoTooltip.hidden { display: none; }

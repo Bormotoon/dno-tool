@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+    <link rel="icon" href="favicon.ico">
+    <title>DNO Tool — Веб-управление</title>
+    <link rel="stylesheet" href="styles.css?v=46">
+    <link rel="stylesheet" href="desktop.css?v=25">
+    <link rel="stylesheet" href="lib/xterm.css?v=1">
+</head>
+<body>
+    <div class="desktop-wallpaper" aria-hidden="true"><canvas id="desktop-sea"></canvas></div>
+    <!-- Custom tooltip -->
+    <div id="dnoTooltip" class="hidden"></div>
+    <header class="app-header">
+        <div class="brand">
+            <button id="menuToggleBtn" class="btn btn-icon menu-toggle" data-tip="Устройства" aria-label="Устройства">☰</button>
+            <span class="logo">⚙</span>
+            <h1>DNO Tool <span id="version" class="version"></span></h1>
+        </div>
+        <div class="auth-box">
+            <button id="loginBtn" class="btn btn-small" data-tip="Войти">Войти</button>
+            <span id="authStatus" class="auth-status">Не авторизован</span>
+        </div>
+    </header>
+
+    <!-- Затемнение для off-canvas drawer дерева (мобильная версия) -->
+    <div id="drawerOverlay" class="drawer-overlay"></div>
+
+    <!-- Модальное окно входа -->
+    <div id="loginModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Аутентификация</h2>
+            <form id="loginForm">
+                <label>Логин<input type="text" id="loginUser" value="admin" required></label>
+                <label>Пароль<input type="password" id="loginPass" required></label>
+                <div class="modal-actions">
+                    <button type="submit" class="btn">Войти</button>
+                    <button type="button" class="btn btn-secondary" id="loginCancel">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Диалог ввода параметров -->
+    <div id="paramsModal" class="modal hidden">
+        <div class="modal-content">
+            <h2 id="paramsModalTitle">Параметры команды</h2>
+            <form id="paramsForm"></form>
+            <div class="modal-actions">
+                <button type="button" class="btn" id="paramsOk">Выполнить</button>
+                <button type="button" class="btn btn-secondary" id="paramsCancel">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="main-layout">
+        <!-- Левая панель: дерево хостов (off-canvas drawer на мобильном) -->
+        <section class="panel tree-panel" id="treePanel">
+            <div class="panel-header">
+                <h2>Устройства</h2>
+                <div class="panel-actions">
+                    <button id="expandAllBtn" class="btn btn-icon" data-tip="Развернуть всё">⊕</button>
+                    <button id="collapseAllBtn" class="btn btn-icon" data-tip="Свернуть всё">⊖</button>
+                    <button id="refreshHostsBtn" class="btn btn-icon" data-tip="Обновить">⟳</button>
+                    <button id="drawerCloseBtn" class="btn btn-icon drawer-close" data-tip="Закрыть">✕</button>
+                </div>
+            </div>
+            <div class="tree-search">
+                <input type="text" id="hostSearch" placeholder="Поиск устройств...">
+            </div>
+            <div id="hostTree" class="tree-view"></div>
+            <div class="panel-footer">
+                <span id="selectedCount">Выбрано: 0</span>
+            </div>
+        </section>
+
+        <!-- Вертикальный разделитель между деревом хостов и правой панелью -->
+        <div class="splitter splitter-v" id="vSplitter" data-tip="Перетащите для изменения размера"></div>
+
+        <!-- Правая панель -->
+        <section class="panel right-panel">
+            <!-- Панель команд: combobox задач с выпадающим деревом -->
+            <div class="command-bar">
+                <span class="command-label">Задача:</span>
+                <div class="task-row">
+                    <div class="task-combobox" id="taskCombobox">
+                        <div class="task-combobox-input placeholder" id="taskComboboxInput">Выберите задачу...</div>
+                        <span class="task-combobox-caret">▾</span>
+                        <div class="task-popup hidden" id="taskPopup">
+                        <div class="task-popup-bar">
+                            <button id="taskPopupCloseBtn" class="btn btn-icon task-popup-close" data-tip="Закрыть">✕</button>
+                            <div class="task-popup-search">
+                                <input type="text" id="taskSearch" placeholder="Поиск задач...">
+                            </div>
+                            <button id="taskExpandAllBtn" class="btn btn-icon" data-tip="Развернуть всё">⊕</button>
+                            <button id="taskCollapseAllBtn" class="btn btn-icon" data-tip="Свернуть всё">⊖</button>
+                        </div>
+                            <div id="taskTree" class="task-popup-tree"></div>
+                        </div>
+                    </div>
+                    <button id="taskInfoBtn" class="btn btn-secondary" data-tip="Информация о задаче">ℹ</button>
+                </div>
+                <div class="execute-wrap">
+                    <button id="executeBtn" class="btn btn-primary">Выполнить</button>
+                </div>
+                <button id="abortBtn" class="btn btn-danger hidden">Отменить</button>
+            </div>
+
+            <!-- Список выбранных устройств -->
+            <div class="split-pane" id="topPane">
+                <div class="panel-header" id="topPaneHeader">
+                    <div class="header-group header-actions">
+                        <button id="vfeatToggle" class="btn btn-icon vfeat-toggle" data-tip="Veyon"><img data-vi="veyon" alt=""></button>
+                        <div class="veyon-features hidden" id="veyonFeatures">
+                            <button class="vfeat-btn" data-feature="lock" data-tip="Заблокировать экран"><img data-vi="lock" alt=""></button>
+                            <button class="vfeat-btn" data-feature="unlock" data-tip="Разблокировать экран"><img data-vi="unlock" alt=""></button>
+                            <button class="vfeat-btn" data-feature="lock_input" data-tip="Заблокировать ввод"><img data-vi="lock_input" alt=""></button>
+                            <button class="vfeat-btn" data-feature="unlock_input" data-tip="Разблокировать ввод"><img data-vi="unlock_input" alt=""></button>
+                            <span class="vfeat-sep"></span>
+                            <button class="vfeat-btn" data-feature="login" data-tip="Вход пользователя (Veyon)"><img data-vi="login" alt=""></button>
+                            <button class="vfeat-btn" data-feature="logoff_webapi" data-tip="Выход пользователя (Veyon)"><img data-vi="logoff" alt=""></button>
+                            <span class="vfeat-sep"></span>
+                            <button class="vfeat-btn" data-feature="website" data-tip="Открыть сайт"><img data-vi="website" alt=""></button>
+                            <button class="vfeat-btn" data-feature="start_app" data-tip="Запустить программу"><img data-vi="start_app" alt=""></button>
+                            <button class="vfeat-btn" data-feature="message" data-tip="Отправить сообщение"><img data-vi="message" alt=""></button>
+                            <span class="vfeat-sep"></span>
+                            <button class="vfeat-btn" data-feature="restart_service" data-tip="Перезагрузить сервис Veyon"><img data-vi="restart_service" alt=""></button>
+                        </div>
+                        <button id="ctrlToggle" class="btn btn-icon ctrl-toggle" data-tip="Управление"><img data-vi="control" alt=""></button>
+                        <div class="ctrl-features" id="ctrlFeatures">
+                            <button class="vfeat-btn" data-feature="ssh_lock" data-tip="Заблокировать экран (SSH)"><img data-vi="lock" alt=""></button>
+                            <button class="vfeat-btn" data-feature="ssh_unlock" data-tip="Разблокировать экран (SSH)"><img data-vi="unlock" alt=""></button>
+                            <button class="vfeat-btn" data-feature="ssh_lock_input" data-tip="Заблокировать ввод (SSH)"><img data-vi="lock_input" alt=""></button>
+                            <button class="vfeat-btn" data-feature="ssh_unlock_input" data-tip="Разблокировать ввод (SSH)"><img data-vi="unlock_input" alt=""></button>
+                            <span class="vfeat-sep"></span>
+                            <button class="vfeat-btn" data-feature="login_ssh" data-tip="Вход в систему (SSH)"><img data-vi="login" alt=""></button>
+                            <button class="vfeat-btn" data-feature="logoff" data-tip="Завершить сеанс (SSH)"><img data-vi="logoff" alt=""></button>
+                            <span class="vfeat-sep"></span>
+                            <button class="vfeat-btn" data-feature="power_on" data-tip="Включить (Wake-on-LAN)"><img data-vi="power_on" alt=""></button>
+                            <button class="vfeat-btn" data-feature="reboot" data-tip="Перезагрузить"><img data-vi="reboot" alt=""></button>
+                            <button class="vfeat-btn" data-feature="powerdown" data-tip="Выключить"><img data-vi="powerdown" alt=""></button>
+                        </div>
+                        <button id="onlineOnlyBtn" class="btn btn-icon" data-tip="Показывать только онлайн-устройства"><svg viewBox="0 0 128 128" width="22" height="22" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="24" y="28" width="80" height="58" rx="8" fill="#22C55E" fill-opacity="0.25" stroke="#22C55E" stroke-width="7"/><path d="M48 58 L60 70 L82 46" stroke="#fff" stroke-width="7"/><path d="M64 86 V100 M48 100 H80" stroke="#22C55E" stroke-width="7"/></svg></button>
+                        <div class="view-mode-switch" id="viewModeSwitch">
+                            <button class="view-btn active" data-mode="list" data-tip="Список">☰</button>
+                            <button class="view-btn" data-mode="icons" data-tip="Иконки">▦</button>
+                            <button class="view-btn" data-mode="thumbs" data-tip="Миниатюры">▣</button>
+                        </div>
+                        <label class="device-size-control" id="deviceSizeControl" for="deviceSizeSlider">
+                            <span>Размер:</span>
+                            <input id="deviceSizeSlider" type="range" min="32" max="512" step="8" value="64" aria-label="Размер иконок и миниатюр устройств" aria-describedby="deviceSizeValue">
+                            <output id="deviceSizeValue" for="deviceSizeSlider">64 px</output>
+                        </label>
+                        <button id="groupBtn" class="btn btn-icon" data-tip="Группировать по папкам">⊟</button>
+                        <button id="clearSelBtn" class="btn btn-icon" data-tip="Очистить">✕</button>
+                    </div>
+                </div>
+                <div id="selectedList" class="device-list mode-list"></div>
+            </div>
+
+            <!-- Перетаскиваемый горизонтальный разделитель -->
+            <div class="splitter" id="hSplitter" data-tip="Перетащите для изменения размера"></div>
+
+            <!-- Результаты -->
+            <div class="split-pane" id="bottomPane">
+                <div class="panel-header">
+                    <h2>Результат</h2>
+                    <div class="jobs-badge-wrap">
+                        <div class="jobs-badge status-idle" id="jobsBadge">
+                            <span id="runStatus" class="badge-label">Готов</span><button id="recentJobsClock" class="badge-clock hidden" data-tip="Недавно завершённые задания">🕒</button>
+                        </div>
+                        <div id="activeJobsPanel" class="active-jobs-panel hidden">
+                            <div class="active-jobs-list"></div>
+                        </div>
+                    </div>
+                    <div class="panel-actions">
+                        <button id="clearResultsBtn" class="btn btn-icon" data-tip="Очистить">✕</button>
+                    </div>
+                </div>
+                <div id="resultsArea" class="results-area">
+                    <div class="empty-state">Выберите устройства и задачу, затем нажмите «Выполнить»</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Информация о задаче -->
+    <div id="taskInfoModal" class="modal hidden">
+        <div class="modal-content task-info-dialog">
+            <h2 id="taskInfoTitle">Информация о задаче</h2>
+            <div id="taskInfoBody" class="task-info-body"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="taskInfoClose">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Контейнер всплывающих уведомлений (тостов) -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="network-errors.js?v=1"></script>
+    <script src="app.js?v=51"></script>
+    <script src="desktop-wallpaper.js?v=1"></script>
+    <script src="desktop-layout.js?v=1"></script>
+    <script src="desktop.js?v=8"></script>
+    <script src="desktop-tools.js?v=8"></script>
+    <script src="desktop-network.js?v=10"></script>
+    <script src="desktop-cameras.js?v=12"></script>
+    <script src="lib/xterm.min.js?v=1"></script>
+    <script src="lib/addon-fit.min.js?v=1"></script>
+    <script src="desktop-hosttools.js?v=2"></script>
+    <script src="desktop-info.js?v=3"></script>
+    <script src="desktop-terminal.js?v=3"></script>
+    <script src="desktop-files.js?v=3"></script>
+</body>
+</html>

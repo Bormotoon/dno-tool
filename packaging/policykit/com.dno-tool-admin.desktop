@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DNO Tool (с повышенными правами)
+Name[ru]=DNO Tool (с повышенными правами)
+Comment=Network device management tool (elevated)
+Comment[ru]=Инструмент управления сетевыми устройствами (запуск с правами администратора)
+Exec=dno-tool-admin
+Icon=dno-tool
+Terminal=false
+Categories=System;Network;Settings;
+Keywords=network;ssh;sftp;ping;
+StartupNotify=true
+X-PolicyKit-Action-Id=com.dno-tool.run-admin

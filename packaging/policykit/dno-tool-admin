@@ -1,0 +1,25 @@
+#!/bin/bash
+# dno-tool-admin — запуск dno-tool с сохранением окружения пользователя
+
+set -e
+
+# Программа живет в /opt, /usr/bin/dno-tool - симлинк на нее.
+DNOTOOL_BIN="/opt/dno-tool/dno-tool"
+if [ ! -x "${DNOTOOL_BIN}" ]; then
+    DNOTOOL_BIN="/usr/bin/dno-tool"
+fi
+
+exec pkexec env \
+    DISPLAY="$DISPLAY" \
+    XAUTHORITY="$XAUTHORITY" \
+    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+    XDG_CONFIG_HOME="${HOME}/.config" \
+    XDG_DATA_DIRS="${XDG_DATA_DIRS:-/usr/local/share:/usr/share}" \
+    XDG_CACHE_HOME="${HOME}/.cache" \
+    HOME="$HOME" \
+    PATH="$PATH" \
+    DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
+    QT_QPA_PLATFORMTHEME="${QT_QPA_PLATFORMTHEME:-kde}" \
+    KDE_SESSION_VERSION="${KDE_SESSION_VERSION:-5}" \
+    KDE_FULL_SESSION="${KDE_FULL_SESSION:-true}" \
+    "$DNOTOOL_BIN" "$@"

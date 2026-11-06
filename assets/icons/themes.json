@@ -1,0 +1,34 @@
+[
+  {
+    "id": "flat",
+    "name": "Flat"
+  },
+  {
+    "id": "classic",
+    "name": "Classic"
+  },
+  {
+    "id": "midnight",
+    "name": "Midnight"
+  },
+  {
+    "id": "paper",
+    "name": "Paper"
+  },
+  {
+    "id": "neon",
+    "name": "Neon"
+  },
+  {
+    "id": "line",
+    "name": "Line"
+  },
+  {
+    "id": "solid",
+    "name": "Solid"
+  },
+  {
+    "id": "badge",
+    "name": "Badge"
+  }
+]
