@@ -236,6 +236,8 @@ def _thumbnail_metric_rows(values: dict[str, Any]) -> list[tuple[str, str]]:
         "cache_hits": "Выдано из кэша (всего)",
         "connections": "Подключения (всего)",
         "reconnects": "Переподключения",
+        "server_scaled_sessions": "Сеансы с уменьшением кадра на сервере",
+        "scale_requests": "Запросы размера кадра у сервера (всего)",
         "busy": "Запросы без свободных ресурсов (всего)",
         "evictions": "Удаления из кэша / сеансов (всего)",
         "auth_failed": "Ошибки аутентификации",

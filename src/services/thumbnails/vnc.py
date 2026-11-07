@@ -117,6 +117,11 @@ class _Session:
     status: ThumbnailStatus = ThumbnailStatus.UNAVAILABLE
     error_code: str | None = None
     retiring: bool = False
+    # Размеры запросов к сеансу и время последнего запроса каждого: по ним
+    # выбирается размер кадра, который присылает сервер с расширением миниатюр.
+    size_requests: dict[tuple[int, int], float] = field(
+        default_factory=dict, repr=False
+    )
 
     @property
     def memory_bytes(self) -> int:
@@ -176,6 +181,7 @@ class VncBackend:
             "protocol_errors": 0,
             "connections": 0,
             "reconnects": 0,
+            "scale_requests": 0,
             "bytes_received": 0,
             "bytes_sent": 0,
             "capture_seconds": 0.0,
@@ -187,6 +193,43 @@ class VncBackend:
     def is_available(self) -> bool:
         """Report dependency readiness, not remote authentication or reachability."""
         return not self._shutdown
+
+    def _server_size(
+        self, entry: _Session, request: ThumbnailRequest
+    ) -> tuple[int, int]:
+        """Размер кадра, который сеанс просит у сервера.
+
+        Сеанс обслуживает несколько вариантов (список, веб, ноды), поэтому
+        берётся наибольший размер среди запросов за последние
+        ``3 × интервал`` (не меньше 30 с): больший вариант применяется сразу,
+        а к меньшему сеанс возвращается только после выдержки, иначе варианты
+        гоняли бы размер кадра туда и обратно с полной пересылкой каждый раз.
+        Вызывается под ``entry.lock``.
+        """
+        now = self._clock()
+        window = max(30.0, 3.0 * entry.interval_sec)
+        entry.size_requests[(request.width, request.height)] = now
+        for size, seen in list(entry.size_requests.items()):
+            if now - seen > window:
+                del entry.size_requests[size]
+        return (
+            max(width for width, _ in entry.size_requests),
+            max(height for _, height in entry.size_requests),
+        )
+
+    def _request_server_size(
+        self,
+        entry: _Session,
+        client: RfbSession,
+        request: ThumbnailRequest,
+        deadline: float,
+    ) -> None:
+        """Передать серверу размер миниатюры; без расширения ничего не делает."""
+        if not client.scaling_supported:
+            return
+        if client.request_size(*self._server_size(entry, request), deadline):
+            with self._lock:
+                self._metrics["scale_requests"] += 1
 
     @staticmethod
     def _result(
@@ -502,6 +545,7 @@ class VncBackend:
                     request.password,
                     reserve=reserve_frame,
                     limits=self._rfb_limits,
+                    server_scaling=True,
                 )
                 entry.image_version = -1  # Frame versions restart on a new socket.
                 entry.client = client
@@ -520,10 +564,15 @@ class VncBackend:
                     + image_work
                     + sum(len(value[0]) for value in entry.cache.values()),
                 )
+            # До чтения кадра: сервер с расширением сразу пришлёт кадр нужного
+            # размера, без лишней пересылки полного.
+            self._request_server_size(entry, client, request, deadline)
             if not client.complete:
                 while not client.complete and time.monotonic() < deadline:
                     if not client.poll(deadline):
                         break
+                    # Подтверждение расширения могло прийти позже подключения.
+                    self._request_server_size(entry, client, request, deadline)
                 if self._shutdown or entry.retiring:
                     return self._result(
                         request, ThumbnailStatus.CANCELLED, "session_released"
@@ -537,6 +586,18 @@ class VncBackend:
                 updated = True
             else:
                 updated = self._read_current_screen(client, deadline, poll_timeout)
+                if not client.complete:
+                    # Сервер сменил размер кадра (запрошен другой размер миниатюры
+                    # или изменился экран): дочитать новый кадр в этом же захвате.
+                    while (
+                        not client.complete
+                        and time.monotonic() < deadline
+                        and not self._shutdown
+                        and not entry.retiring
+                    ):
+                        if not client.poll(deadline):
+                            break
+                    updated = updated or client.complete
             if self._shutdown or entry.retiring:
                 return self._result(
                     request, ThumbnailStatus.CANCELLED, "session_released"
@@ -779,6 +840,11 @@ class VncBackend:
                     for value in entry.cache.values()
                 ),
                 memory_reserved_bytes=reserved,
+                server_scaled_sessions=sum(
+                    1
+                    for entry in self._sessions.values()
+                    if entry.client is not None and entry.client.server_scaled
+                ),
                 max_sessions=self._max_sessions,
                 max_memory_bytes=self._max_memory_bytes,
                 max_screen_pixels=self._rfb_limits.max_screen_pixels,

@@ -1,6 +1,7 @@
 """Bounded, read-only RFB 3.3/3.7/3.8 client with resumable update parsing.
 
-Only Raw, standard Zlib and DesktopSize are advertised. Classic VNC DES
+Only Raw, standard Zlib and DesktopSize are advertised (plus the kmsvnc
+thumbnail pseudo-encoding when ``server_scaling`` is requested). Classic VNC DES
 authentication uses the first eight *UTF-8 bytes*, not eight characters. This
 is not an encrypted transport; use it only on a trusted/protected network.
 """
@@ -37,6 +38,28 @@ MAX_FRAME_BYTES = 64_000_000
 MAX_TEXT_BYTES = 1_048_576
 MAX_RECTANGLES = 16_384
 PIXEL_FORMAT = struct.pack(">BBBBHHHBBB3x", 32, 24, 0, 1, 255, 255, 255, 16, 8, 0)
+# Расширение kmsvnc для миниатюр (packaging/kmsvnc/src/thumbnail.h): клиент
+# объявляет псевдокодировку, сервер подтверждает её прямоугольником без данных,
+# и только после этого клиент присылает желаемый размер кадра. Чужой сервер
+# псевдокодировку игнорирует и сообщения о размере не получает.
+THUMBNAIL_ENCODING = 0x444E4F54
+THUMBNAIL_MESSAGE = 0xC4
+_THUMBNAIL_ACK = struct.pack(">BBHHHHHi", 0, 0, 1, 0, 0, 0, 0, THUMBNAIL_ENCODING)
+# Подтверждение приходит через один обмен после SetEncodings. Ожидание
+# привязано к времени обмена при подключении: на старом сервере подтверждения
+# нет, и подключение не должно ждать долго.
+SCALING_ACK_MIN_WAIT_SEC = 0.1
+SCALING_ACK_MAX_WAIT_SEC = 1.0
+
+
+def _matches_thumbnail_ack(data: bytes | bytearray) -> bool:
+    """Совпадает ли начало буфера с подтверждением (версия и размеры любые)."""
+    for index, value in enumerate(bytes(data[: len(_THUMBNAIL_ACK)])):
+        if 4 <= index < 12:
+            continue
+        if value != _THUMBNAIL_ACK[index]:
+            return False
+    return True
 
 
 @dataclass(frozen=True)
@@ -118,6 +141,7 @@ class RfbSession:
         reserve: Callable[[int], None] | None = None,
         read_timeout: float = 5.0,
         limits: RfbLimits | None = None,
+        server_scaling: bool = False,
     ) -> None:
         self.host = host
         self.port = port
@@ -141,6 +165,13 @@ class RfbSession:
         self.protocol_version = 0
         self.security_type = 0
         self._allow_veyon_messages = False
+        # Уменьшение кадра сервером: запрашивается только для миниатюр.
+        self._server_scaling = server_scaling
+        self.scaling_supported = False
+        self.full_width = 0
+        self.full_height = 0
+        self.requested_size: tuple[int, int] | None = None
+        self._handshake_rtt = 0.0
         self._decompressor = zlib.decompressobj()
         self._buffer = bytearray()
         self._parser: Generator[int, bytes, None] | None = None
@@ -290,15 +321,19 @@ class RfbSession:
                 if result:
                     # The reason is untrusted and not necessary for diagnosis.
                     raise RfbError("authentication_rejected", "auth_failed")
+            exchange_started = time.monotonic()
             self._send(b"\x01", deadline)  # shared, never displace interactive clients
             init = self._read(24, deadline)
+            self._handshake_rtt = time.monotonic() - exchange_started
             width, height = struct.unpack(">HH", init[:4])
             name_size = struct.unpack(">I", init[20:])[0]
             if name_size > MAX_TEXT_BYTES:
                 raise RfbError("name_length")
             self._resize(width, height)
             self._discard(name_size, deadline)
-            self._select_pixel_format(deadline)
+            self._select_pixel_format(deadline, server_scaling=self._server_scaling)
+            if self._server_scaling:
+                self._await_scaling_ack(deadline)
         except (RfbError, OSError):
             self.close()
             raise
@@ -328,10 +363,82 @@ class RfbSession:
             self.close()
             raise
 
-    def _select_pixel_format(self, deadline: float) -> None:
-        """Запросить только поддерживаемые форматы без ввода и clipboard."""
+    def _select_pixel_format(
+        self, deadline: float, *, server_scaling: bool = False
+    ) -> None:
+        """Запросить только поддерживаемые форматы без ввода и clipboard.
+
+        Псевдокодировка миниатюр объявляется только по ``server_scaling``:
+        окно VNC, веб-вьювер и Veyon всегда получают полный кадр.
+        """
         self._send(b"\x00\x00\x00\x00" + PIXEL_FORMAT, deadline)
-        self._send(struct.pack(">BBHiii", 2, 0, 3, 6, 0, -223), deadline)
+        encodings = [6, 0, -223]
+        if server_scaling:
+            encodings.append(THUMBNAIL_ENCODING)
+        self._send(
+            struct.pack(f">BBH{len(encodings)}i", 2, 0, len(encodings), *encodings),
+            deadline,
+        )
+
+    def _await_scaling_ack(self, deadline: float) -> None:
+        """Коротко подождать подтверждение расширения миниатюр kmsvnc.
+
+        Подтверждение — первое, что присылает такой сервер: обновления кадра
+        без запроса не отправляются. Чужие данные не разбираются и остаются в
+        буфере для обычного разбора. Опоздавшее подтверждение примет разбор
+        обновлений, тогда размер запросится на следующем шаге захвата.
+        """
+        wait = min(
+            SCALING_ACK_MAX_WAIT_SEC,
+            max(SCALING_ACK_MIN_WAIT_SEC, 4 * self._handshake_rtt),
+        )
+        wait_until = min(deadline, time.monotonic() + wait)
+        size = len(_THUMBNAIL_ACK)
+        while len(self._buffer) < size:
+            if not _matches_thumbnail_ack(self._buffer):
+                return
+            try:
+                self._receive(size - len(self._buffer), wait_until)
+            except RfbError as error:
+                if error.status == "timeout":
+                    return
+                raise
+        if not _matches_thumbnail_ack(self._buffer):
+            return
+        version, _divisor, width, height = struct.unpack(">HHHH", self._buffer[4:12])
+        del self._buffer[:size]
+        self._accept_scaling(version, width, height)
+
+    def _accept_scaling(self, version: int, width: int, height: int) -> None:
+        if not self._server_scaling or not version or not width or not height:
+            raise RfbError("thumbnail_ack")
+        self.scaling_supported = True
+        self.full_width, self.full_height = width, height
+
+    def request_size(self, width: int, height: int, deadline: float) -> bool:
+        """Попросить сервер присылать кадр не меньше ``width``×``height``.
+
+        Отправляется только после подтверждения расширения. ``0×0`` возвращает
+        полный размер. Сервер уменьшает кадр в целое число раз; если делитель не
+        изменился, кадр клиента остаётся прежним. True — сообщение отправлено.
+        """
+        if not self.scaling_supported:
+            return False
+        size = (min(max(width, 0), 0xFFFF), min(max(height, 0), 0xFFFF))
+        if size == self.requested_size:
+            return False
+        self._send(struct.pack(">BBHH", THUMBNAIL_MESSAGE, 0, *size), deadline)
+        self.requested_size = size
+        return True
+
+    @property
+    def server_scaled(self) -> bool:
+        """Сервер сейчас присылает кадр меньше полного экрана."""
+        return (
+            self.scaling_supported
+            and bool(self.width)
+            and (self.width, self.height) != (self.full_width, self.full_height)
+        )
 
     def _resize(self, width: int, height: int) -> None:
         pixels = width * height
@@ -400,6 +507,10 @@ class RfbSession:
             for index in range(count):
                 rect = yield 12
                 x, y, w, h, encoding = struct.unpack(">HHHHi", rect)
+                if encoding == THUMBNAIL_ENCODING:
+                    # Опоздавшее подтверждение расширения миниатюр, без данных.
+                    self._accept_scaling(x, w, h)
+                    continue
                 if encoding == -223:
                     if x or y or index != count - 1:
                         raise RfbError("desktop_size")

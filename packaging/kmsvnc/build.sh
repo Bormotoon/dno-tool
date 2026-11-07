@@ -17,9 +17,13 @@ IMAGE=docker.io/rosalab/rosa2021.1@sha256:2be149fd2f4e00bb4da5c3ea7ce600bc29e47d
 MIRROR=${KMSVNC_MIRROR:-http://os.mos.ru/repo/r/rosa2021.1/base/release/repository/x86_64}
 COMMIT=$(sed -n 's/^%global commit[[:space:]]*//p' "$HERE/kmsvnc.spec")
 TARBALL="kmsvnc-$COMMIT.tar.gz"
-SOURCE_COMMIT=9a18e250e7d4063da65f51b39aebe4b50a401088
-SOURCE_SHA256=7456af5f4c00c013bc3cf57cc00a706059a1b123d9a985d24f3cb15fe70f80c8
+SOURCE_COMMIT=a480cd72d364c83ace42be0eb1bf2dc22ac8f24d
+SOURCE_SHA256=be1b302bee7426e0fc777d849b6f15142e7711deb4a66512711ce5788e33a9a1
 SOURCE_URL="https://codeload.github.com/xp9k/kmsvnc/tar.gz/$SOURCE_COMMIT"
+# libvncserver встраивается в kmsvnc статически (см. kmsvnc.spec).
+LVS_VERSION=$(sed -n 's/^%global lvs_version[[:space:]]*//p' "$HERE/kmsvnc.spec")
+LVS_SHA256=62352c7795e231dfce044beb96156065a05a05c974e5de9e023d688d8ff675d7
+LVS_URL="https://codeload.github.com/LibVNC/libvncserver/tar.gz/LibVNCServer-$LVS_VERSION"
 
 if command -v podman >/dev/null; then ENGINE=podman
 elif command -v docker >/dev/null; then ENGINE=docker
@@ -40,7 +44,11 @@ fi
 test -f "$SOURCE_DIR/CMakeLists.txt"
 tar -C "$SOURCE_DIR" --exclude=.git --transform "s,^,kmsvnc-$COMMIT/," \
     -czf "$WORK/SOURCES/$TARBALL" .
+curl -fsSL --retry 2 -o "$WORK/SOURCES/libvncserver-$LVS_VERSION.tar.gz" "$LVS_URL"
+echo "$LVS_SHA256  $WORK/SOURCES/libvncserver-$LVS_VERSION.tar.gz" | sha256sum -c --quiet -
 # Windows-checkout может дать CRLF, rpmbuild его не принимает.
+sed 's/\r$//' "$HERE/libvncserver-detach-client-thread.patch" \
+    > "$WORK/SOURCES/libvncserver-detach-client-thread.patch"
 sed 's/\r$//' "$HERE/kmsvnc.spec" > "$WORK/kmsvnc.spec"
 
 "$ENGINE" run --rm -i -v "$WORK:/work:Z" -v "$OUT:/out:Z" -e MIRROR="$MIRROR" "$IMAGE" bash -s <<'INNER'
@@ -58,11 +66,12 @@ done
 # Образ новее репозитория МОС 12: выравниваем версии, иначе, например,
 # libmagic не читает базу file и rpmbuild падает.
 dnf -y -q --allowerasing distro-sync
-dnf -y -q --setopt=install_weak_deps=False install rpm-build gcc make cmake \
-    'pkgconfig(libdrm)' 'pkgconfig(libvncserver)' 'pkgconfig(xkbcommon)' \
+dnf -y -q --setopt=install_weak_deps=False install rpm-build gcc make cmake patch \
+    'pkgconfig(libdrm)' 'pkgconfig(xkbcommon)' \
+    'pkgconfig(zlib)' 'pkgconfig(libjpeg)' 'pkgconfig(libpng)' \
     'pkgconfig(libva)' 'pkgconfig(libva-drm)' \
     'pkgconfig(egl)' 'pkgconfig(glesv2)' 'pkgconfig(gbm)' 'pkgconfig(json-c)'
-echo "Окружение: $(getconf GNU_LIBC_VERSION), $(rpm -q lib64vncserver-devel lib64va-devel)"
+echo "Окружение: $(getconf GNU_LIBC_VERSION), $(rpm -q lib64va-devel)"
 rpmbuild -ba --define '_topdir /work' --define '_sourcedir /work/SOURCES' /work/kmsvnc.spec
 find /work/RPMS /work/SRPMS -name '*.rpm' -exec cp {} /out/ \;
 INNER

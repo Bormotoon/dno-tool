@@ -1,0 +1,48 @@
+libvncserver: отсоединять поток клиента после отключения.
+
+clientInput создаётся присоединяемым, а присоединяет его только
+rfbShutdownServer для клиентов, ещё оставшихся в списке. Каждое обычное
+отключение оставляло стек и TLS потока. Ошибка есть в 0.9.13 и 0.9.15.
+
+--- a/src/libvncserver/main.c
++++ b/src/libvncserver/main.c
+@@ -517,6 +517,15 @@
+     return THREAD_ROUTINE_RETURN_VALUE;
+ }
+ 
++#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
++/*
++ * dno-tool: rfbShutdownServer присоединяет потоки клиентов, которые ещё в
++ * списке. Поток клиента, завершившийся раньше, никто не присоединял: стек и
++ * TLS оставались навсегда (около 20 КиБ RSS и 8 МиБ адресов на подключение).
++ */
++static volatile int rfbClientThreadsJoinedOnShutdown = 0;
++#endif
++
+ static THREAD_ROUTINE_RETURN_TYPE
+ clientInput(void *data)
+ {
+@@ -609,6 +618,12 @@
+     cl->sock = RFB_INVALID_SOCKET;
+ 
+     rfbClientConnectionGone(cl);
++
++#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
++    /* dno-tool: при остановке сервера поток присоединит rfbShutdownServer. */
++    if (!rfbClientThreadsJoinedOnShutdown)
++        pthread_detach(pthread_self());
++#endif
+ 
+     return THREAD_ROUTINE_RETURN_VALUE;
+ }
+@@ -1198,6 +1213,10 @@
+ }
+ 
+ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
++#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
++  if(disconnectClients)
++    rfbClientThreadsJoinedOnShutdown = 1;
++#endif
+   if(disconnectClients) {
+     rfbClientIteratorPtr iter = rfbGetClientIterator(screen);
+     rfbClientPtr nextCl, currentCl = rfbClientIteratorNext(iter);

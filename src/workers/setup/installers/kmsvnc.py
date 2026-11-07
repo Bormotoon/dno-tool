@@ -18,9 +18,9 @@ from src.workers.setup.installers.system_vnc import (
 from src.workers.setup.templates import _KMSVNC_SERVICE_TEMPLATE
 
 RPM = BundledRpm(
-    file_name="kmsvnc-0.0.6-6.20240625git190db24.dno-rosa2021.1.x86_64.rpm",
-    sha256="3b4c53c15a74ca036a9a3d9ab386e397669ad272b9e26984e724361cc16df2b8",
-    evr="0.0.6-6.20240625git190db24.dno",
+    file_name="kmsvnc-0.0.6-9.20240625git190db24.dno-rosa2021.1.x86_64.rpm",
+    sha256="c39e03a6adb7615b27d30f3089c89f090d7681252dabea11885c0f8085486806",
+    evr="0.0.6-9.20240625git190db24.dno",
 )
 RPM_ARCH = "x86_64"
 # Старшая версия символов glibc в программе (objdump -T): пакет собран
