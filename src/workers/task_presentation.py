@@ -33,6 +33,7 @@ _TYPE_LABELS = {
     "host_info_ping": "Проверка доступности",
     "node_command_control": "Команда на ноде",
     "node_vnc_url": "Удалённый экран ноды",
+    "vnc_screens": "Мониторы хоста для окна VNC",
     "veyon_status": "Статус Veyon",
     "camera_ping": "Проверка камеры",
     "thumbnail_release": "Освобождение миниатюр",

@@ -21,6 +21,7 @@ INTERACTIVE_TASK_TYPES = frozenset(
         "host_info",
         "node_info",
         "node_vnc_url",
+        "vnc_screens",
         "veyon_status",
         "node_server_settings",
         "web_server_settings",

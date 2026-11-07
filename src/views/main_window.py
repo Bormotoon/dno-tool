@@ -1035,9 +1035,7 @@ class MainWindow(QWidget):
         self.veyon_settings_action.triggered.connect(self.show_veyon_settings_dialog)
         self.remote_menu.addAction(self.veyon_settings_action)
 
-        vnc_settings_action = make_action(
-            "menu_vnc", "Настройки VNC (x11vnc / krfb)", self
-        )
+        vnc_settings_action = make_action("menu_vnc", "Настройки VNC", self)
         vnc_settings_action.triggered.connect(self.show_vnc_settings_dialog)
         self.remote_menu.addAction(vnc_settings_action)
 
@@ -1734,6 +1732,7 @@ class MainWindow(QWidget):
         """Запустить окно удалённого доступа (просмотр/управление).
 
         mode: "view"|"control" - Veyon (veyon-cli remoteaccess);
+              "vnc_view"|"vnc_control" - окно VNC программы (VncViewerWindow);
               "krfb_view"|"krfb_control" - KRFB (krdc/браузер с backend=krfb);
               "krfbkr_view"|"krfbkr_control" - KRFB принудительно через krdc;
               "krfbbr_view"|"krfbbr_control" - KRFB принудительно через браузер.
@@ -1742,6 +1741,23 @@ class MainWindow(QWidget):
 
         if not device:
             QMessageBox.information(self, "Удалённый доступ", "Устройство не выбрано.")
+            return
+
+        # Окно VNC программы: прямое подключение к VNC-серверу хоста.
+        if mode in ("vnc_view", "vnc_control"):
+            _nid = getattr(device, "node_iid", None)
+            if _nid and _nid != LOCAL_NODE_IID:
+                QMessageBox.information(
+                    self, "VNC", "Окно VNC доступно только для локальных хостов."
+                )
+                return
+            from src.ui.dialogs.tools.vnc_viewer import open_vnc_viewer
+
+            open_vnc_viewer(
+                device,
+                "view" if mode == "vnc_view" else "control",
+                getattr(self, "view_state", None),
+            )
             return
 
         # KRFB-режимы: через KRFBService. На Windows всегда браузер; на
@@ -3459,6 +3475,9 @@ class MainWindow(QWidget):
         self.listview.clear_devices()
         self.treeview.clear_devices()
         self.worker_bridge.request_stop_all()
+        from src.ui.dialogs.tools.vnc_viewer import close_all_vnc_viewers
+
+        close_all_vnc_viewers()
         from src.workers.video_editor.thumbnail_worker import shutdown_media_pools
 
         shutdown_media_pools(wait_ms=0)

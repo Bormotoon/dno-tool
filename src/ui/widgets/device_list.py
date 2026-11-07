@@ -61,7 +61,6 @@ CONTROL_FEATURE_GROUPS = (
     ),
 )
 from src.config import ICONS, config
-from src.config.settings import DEFAULT_VNC_SERVER
 from src.ui.icons import _icon_from_key, qicon_from_path  # zip-темы: иконки из памяти
 from src.domain.models.device import DeviceModel
 from src.domain.device_identity import device_identity, device_key
@@ -2318,95 +2317,42 @@ class DeviceListView(QWidget):
                 )
                 menu.addMenu(control_submenu)
 
-                # Подменю «VNC (бекенд)» — динамическое: имя бекенда берётся
-                # из настроек (veyon.vnc_server; per-host override), а не
-                # захардкодено. Требует SSH-операций (пароль/рестарт) — для
-                # нод-хостов не показывается (нет прямого SSH).
-                vnc_server = (
-                    getattr(item.device, "vnc_server", None)
-                    or getattr(config.app.veyon, "vnc_server", DEFAULT_VNC_SERVER)
-                    or DEFAULT_VNC_SERVER
-                )
-                backend_label = {"krfb": "KRFB", "kmsvnc": "kmsvnc"}.get(
-                    vnc_server, "x11vnc"
-                )
+                # Подменю «VNC» — общее для x11vnc, kmsvnc и KRFB: сервер на
+                # хосте определяется по SSH при смене пароля/перезапуске.
+                # Просмотр и управление — в окне программы (VncViewerWindow),
+                # браузерный вьювер оставлен отдельным пунктом. Требует прямого
+                # подключения и SSH — для нод-хостов не показывается.
                 if not is_remote_node:
-                    vnc_submenu = QMenu(f"VNC ({backend_label})", self)
+                    vnc_submenu = QMenu("VNC", self)
                     vnc_submenu.setIcon(_icon_from_key("menu_krfb"))
 
-                    import sys as _sys
-
-                    if _sys.platform == "win32":
-                        # Windows: krdc недоступен - только браузер.
-                        vnc_view_action = vnc_submenu.addAction(
-                            _icon_from_key("menu_veyon_view"),
-                            "Просмотр экрана (браузер)",
+                    vnc_view_action = vnc_submenu.addAction(
+                        _icon_from_key("menu_veyon_view"), "Просмотр экрана"
+                    )
+                    vnc_view_action.triggered.connect(
+                        lambda: self.veyonAccessRequested.emit(item.device, "vnc_view")
+                    )
+                    vnc_control_action = vnc_submenu.addAction(
+                        _icon_from_key("menu_veyon_control"), "Управление"
+                    )
+                    vnc_control_action.triggered.connect(
+                        lambda: self.veyonAccessRequested.emit(
+                            item.device, "vnc_control"
                         )
-                        vnc_view_action.triggered.connect(
-                            lambda: self.veyonAccessRequested.emit(
-                                item.device, "krfbbr_view"
-                            )
+                    )
+                    vnc_browser_action = vnc_submenu.addAction(
+                        _icon_from_key("menu_terminal"), "Открыть в браузере"
+                    )
+                    vnc_browser_action.triggered.connect(
+                        lambda: self.veyonAccessRequested.emit(
+                            item.device, "krfbbr_control"
                         )
-                        vnc_control_action = vnc_submenu.addAction(
-                            _icon_from_key("menu_veyon_control"),
-                            "Управление (браузер)",
-                        )
-                        vnc_control_action.triggered.connect(
-                            lambda: self.veyonAccessRequested.emit(
-                                item.device, "krfbbr_control"
-                            )
-                        )
-                    else:
-                        # Linux: клиент krdc (если установлен) + браузер.
-                        from src.services.remote.krfb_service import KRFBService
-
-                        # krdc установлен - обязательное условие клиентских
-                        # пунктов (иначе клик даёт ошибку вместо подключения).
-                        krdc_ok = vnc_server == "krfb" and KRFBService.krdc_available()
-                        if krdc_ok:
-                            vnc_view_action = vnc_submenu.addAction(
-                                _icon_from_key("menu_veyon_view"),
-                                "Просмотр экрана (клиент)",
-                            )
-                            vnc_view_action.triggered.connect(
-                                lambda: self.veyonAccessRequested.emit(
-                                    item.device, "krfbkr_view"
-                                )
-                            )
-                            vnc_control_action = vnc_submenu.addAction(
-                                _icon_from_key("menu_veyon_control"),
-                                "Управление (клиент)",
-                            )
-                            vnc_control_action.triggered.connect(
-                                lambda: self.veyonAccessRequested.emit(
-                                    item.device, "krfbkr_control"
-                                )
-                            )
-                            vnc_submenu.addSeparator()
-                        vnc_browser_view = vnc_submenu.addAction(
-                            _icon_from_key("menu_veyon_view"),
-                            "Просмотр экрана (браузер)",
-                        )
-                        vnc_browser_view.triggered.connect(
-                            lambda: self.veyonAccessRequested.emit(
-                                item.device, "krfbbr_view"
-                            )
-                        )
-                        vnc_browser_control = vnc_submenu.addAction(
-                            _icon_from_key("menu_veyon_control"),
-                            "Управление (браузер)",
-                        )
-                        vnc_browser_control.triggered.connect(
-                            lambda: self.veyonAccessRequested.emit(
-                                item.device, "krfbbr_control"
-                            )
-                        )
+                    )
 
                     vnc_submenu.addSeparator()
 
                     vnc_password_action = vnc_submenu.addAction(
-                        _icon_from_key("menu_credentials"),
-                        f"Сменить пароль {backend_label}",
+                        _icon_from_key("menu_credentials"), "Сменить пароль VNC"
                     )
                     vnc_password_action.triggered.connect(
                         lambda: self.veyonFeatureRequested.emit(
@@ -2415,8 +2361,7 @@ class DeviceListView(QWidget):
                     )
 
                     vnc_restart_action = vnc_submenu.addAction(
-                        _icon_from_key("veyon_restart_service"),
-                        f"Перезапустить {backend_label}",
+                        _icon_from_key("veyon_restart_service"), "Перезапустить VNC"
                     )
                     vnc_restart_action.triggered.connect(
                         lambda: self.veyonFeatureRequested.emit(
@@ -2435,7 +2380,7 @@ class DeviceListView(QWidget):
                 # website/start_app/message, restart_service (перезапуск
                 # сервиса Veyon на хосте — семантически относится к Veyon).
                 if veyon_available:
-                    veyon_submenu = QMenu("Удалённый экран", self)
+                    veyon_submenu = QMenu("Veyon", self)
                     veyon_submenu.setIcon(_icon_from_key("menu_veyon"))
 
                     veyon_view_action = veyon_submenu.addAction(
