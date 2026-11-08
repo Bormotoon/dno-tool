@@ -39,6 +39,7 @@ from .executor_base import BaseCommandExecutor
 from .locale_utils import build_locale_prefix
 from .prompt_utils import PROMPT_SETTLE_SECONDS, PromptTail, matches_input_prompt
 from .sudo_utils import (
+    build_masked_sudo_prompt,
     ensure_sudo_prefix,
     has_sudo,
     is_sudo_password_prompt,
@@ -302,11 +303,18 @@ class SSHWorker(BaseCommandExecutor):
         # Весь скрипт получает одинаковые права, включая пайпы и перенаправления.
         from .executor_base import get_credentials as _get_creds
 
+        import uuid
+
+        sudo_token_hex = uuid.uuid4().hex
+        expected_sudo_prompt, prompt_arg = build_masked_sudo_prompt(sudo_token_hex)
         _creds = _get_creds(device)
         _original_text = command_text
         if self.desktop_context is None:
-            command_text = ensure_sudo_prefix(command_text, device, _creds.username)
-        if command_text != _original_text:
+            command_text = ensure_sudo_prefix(
+                command_text, device, _creds.username, prompt_arg=prompt_arg
+            )
+        auto_sudo_applied = command_text != _original_text
+        if auto_sudo_applied:
             logger.info(f"[{device.host}] Авто-добавлен sudo")
 
         # Принудительная установка локали для кириллицы.
@@ -461,10 +469,15 @@ class SSHWorker(BaseCommandExecutor):
                     idle_delay = SSH_IDLE_POLL_MIN_SEC
 
                 prompt = matches_input_prompt(prompt_tail.line)
+                is_sudo = (
+                    (expected_sudo_prompt in prompt_tail.line)
+                    if auto_sudo_applied
+                    else is_sudo_password_prompt(prompt_tail.line)
+                )
                 if (
                     prompt
                     and automatic_sudo
-                    and is_sudo_password_prompt(prompt_tail.line)
+                    and is_sudo
                 ):
                     error = sudo_password_error(sudo_password, sudo_password_sent)
                     if error:

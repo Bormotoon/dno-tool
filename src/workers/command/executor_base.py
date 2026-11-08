@@ -162,8 +162,14 @@ def create_ssh_client(
     """Подключить SSH с общей политикой ключей и закрытием при любой ошибке."""
     client = client if client is not None else paramiko.SSHClient()
     try:
+        client.load_system_host_keys()
+        user_known_hosts = os.path.join(_SSH_DIR, "known_hosts")
+        if os.path.isfile(user_known_hosts):
+            try:
+                client.load_host_keys(user_known_hosts)
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(f"Не удалось прочитать {user_known_hosts}: {exc}")
         if config.app.ssh.strict_host_checking:
-            client.load_system_host_keys()
             client.set_missing_host_key_policy(paramiko.RejectPolicy())
         else:
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -181,6 +187,12 @@ def create_ssh_client(
             channel_timeout=10,
         )
         return client
+    except paramiko.BadHostKeyException as err:
+        logger.warning(
+            f"[{device.host}] Внимание: SSH-ключ хоста изменился (возможно MITM или переустановка ОС)! {err}"
+        )
+        client.close()
+        raise
     except Exception:
         client.close()
         raise
