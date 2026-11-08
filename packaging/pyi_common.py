@@ -1,0 +1,138 @@
+from __future__ import annotations
+
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+
+COMMON_WORKER_DATAS = [
+    ("src/workers/gst_rtsp_server.py", "src/workers"),
+    ("src/workers/remote_recording_runtime.py", "src/workers"),
+    ("src/workers/remote_session_lock.py", "src/workers"),
+    ("src/web/static", "src/web/static"),
+]
+
+
+def get_common_package_datas() -> list[tuple[str, str]]:
+    return (
+        collect_data_files("fastapi")
+        + collect_data_files("uvicorn")
+        + collect_data_files("pydantic")
+        + collect_data_files("starlette")
+        + collect_data_files("certifi")
+        + collect_data_files("PySide6", includes=["**/qtbase_ru.qm"])
+    )
+
+
+def get_common_hiddenimports() -> list[str]:
+    base = [
+        "av",
+        "av.codec.hwaccel",
+        "PySide6.QtQuickWidgets",
+        "PySide6.QtMultimedia",
+        "src.services.media",
+        "src.services.media.graph",
+        "src.services.media.render",
+        "src.services.media.camera",
+        "requests",
+        "yaml",
+        "pygments.lexers._php_builtins",
+        "python_multipart",
+        "multipart",
+        "h11",
+        "websockets",
+        "httptools",
+        "uvloop",
+        "cryptography",
+        "cryptography.hazmat.primitives.asymmetric.padding",
+        "cryptography.hazmat.primitives.hashes",
+        "cryptography.hazmat.primitives.serialization",
+        "cryptography.hazmat.primitives.ciphers",
+        "cryptography.hazmat.primitives.ciphers.algorithms",
+        "cryptography.hazmat.primitives.ciphers.modes",
+        "cryptography.hazmat.decrepit.ciphers.algorithms",
+        "cryptography.hazmat.primitives.padding",
+        "psutil",
+        "psutil._psutil_windows",
+        "psutil._pswindows",
+        "psutil._common",
+        "src.web",
+        "src.web.server",
+        "src.web.app",
+        "src.web.desktop_api",
+        "src.web.scanner_api",
+        "src.web.camera_api",
+        "src.web.asset_access",
+        "src.web.device_info_api",
+        "src.web.terminal_api",
+        "src.web.files_api",
+        "src.utils.security.web_tls",
+        "src.services.hosts.device_info.collector",
+        "src.services.remote.camera_web_bridge",
+        "src.workers.task_presentation",
+        "src.utils.text.time_format",
+        "src.utils.text.command_highlight",
+        "pygments.lexers.shell",
+        "src.utils.scanner.engine",
+        "src.web.auth",
+        "src.web.executor",
+        "src.services.configuration.credential_service",
+        "src.services.hosts.host_info_service",
+        "src.services.hosts.kde_service",
+        "src.domain.kde",
+        "src.config.kde_schema",
+        "src.config.kde_help",
+        "src.config.kde_labels",
+        "src.config.kde_catalog_audit",
+        "src.ui.dialogs.kde.kde_config_dialog",
+        "src.ui.dialogs.kde.controller",
+        "src.ui.dialogs.kde.delegates",
+        "src.ui.dialogs.kde.setting_row",
+        "src.ui.dialogs.kde.fields",
+        "src.ui.dialogs.kde.settings_model",
+        "src.workers.kde.operation",
+        "src.workers.kde.remote_script",
+        "src.services.thumbnails.thumbnail_service",
+        "src.services.thumbnails.types",
+        "src.services.thumbnails.veyon",
+        "src.services.thumbnails.vnc",
+        "src.services.thumbnails.rfb",
+        "src.ui.dialogs.common.thumbnail_settings",
+        "src.ui.widgets.bundle_selector",
+        "src.ui.dialogs.tools.credentials",
+        "cryptography.hazmat.primitives.asymmetric.ed25519",
+        "src.utils.security.node_crypto",
+        "src.services.remote.node_service",
+        "src.web.node_server",
+        "src.web.node_api_models",
+        "src.utils.security.node_transport",
+        "src.domain.device_identity",
+        "src.workers.node",
+        "src.workers.node.client",
+        "src.workers.node.status",
+        "src.workers.node.thumbnails",
+        "src.workers.node.command_worker",
+        "src.workers.setup.installers.ssh",
+        "src.workers.setup.installers.packages",
+        "src.workers.setup.installers.veyon",
+        "src.workers.setup.installers.vnc",
+        "src.workers.setup.installers.x11vnc",
+        "src.workers.setup.installers.krfb",
+        "src.workers.setup.installers.vnc_common",
+        "src.workers.setup.installers.system_vnc",
+        "src.workers.setup.installers.kmsvnc",
+        "src.workers.setup.phases",
+        "src.workers.setup.packages",
+        "src.ui.dialogs.wizard.setups.service",
+        "src.ui.dialogs.tools.node_settings",
+    ]
+    for pkg in (
+        "fastapi",
+        "uvicorn",
+        "pydantic",
+        "starlette",
+        "multipart",
+        "python_multipart",
+        "psutil",
+        "icmplib",
+        "ldap3",
+    ):
+        base.extend(collect_submodules(pkg))
+    return base
