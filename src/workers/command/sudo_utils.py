@@ -59,6 +59,16 @@ def is_sudo_password_prompt(buffer: str) -> bool:
     return bool(_SUDO_PROMPT_RE.search(buffer[-512:]))
 
 
+def build_masked_sudo_prompt(token_hex: str) -> tuple[str, str]:
+    """Вернуть (ожидаемый_промпт, shell_аргумент_для_sudo_p).
+    Разделение кавычек гарантирует, что PTY-эхо самой команды никогда не
+    будет содержать склеенную строку маркера до реального выполнения sudo.
+    """
+    expected = f"__DNO_SUDO_{token_hex}__:"
+    shell_arg = "'__DNO_SUDO_'" + shlex.quote(f"{token_hex}__:")
+    return expected, shell_arg
+
+
 def should_use_sudo(device: "DeviceModel | None") -> bool:
     """Определяет, нужно ли использовать sudo для устройства.
 
@@ -76,7 +86,10 @@ def should_use_sudo(device: "DeviceModel | None") -> bool:
 
 
 def ensure_sudo_prefix(
-    command_text: str, device: "DeviceModel | None", username: str
+    command_text: str,
+    device: "DeviceModel | None",
+    username: str,
+    prompt_arg: str = "",
 ) -> str:
     """Выполнить весь SSH-скрипт в root Bash при автоматическом sudo.
 
@@ -88,6 +101,7 @@ def ensure_sudo_prefix(
         command_text: Текст команды (с уже раскрытыми плейсхолдерами).
         device: Устройство.
         username: Логин пользователя (для проверки root).
+        prompt_arg: Строка аргумента для -p (если задана).
 
     Returns:
         Скрипт в повышенной оболочке либо исходный текст для root/без sudo.
@@ -102,7 +116,8 @@ def ensure_sudo_prefix(
             break
     else:
         return command_text
-    return f"sudo -- bash -c {shlex.quote(command_text)}"
+    p_flag = f"-p {prompt_arg} " if prompt_arg else ""
+    return f"sudo {p_flag}-- bash -c {shlex.quote(command_text)}"
 
 
 def sudo_password_error(password: str | None, sent: bool) -> str:
