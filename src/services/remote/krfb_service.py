@@ -762,18 +762,6 @@ class KRFBService(BaseService):
         port = self.resolve_port(device)
         view_flag = 1 if mode == "view" else 0
 
-        # Токен веб-доступа: base64(username:password) первого пользователя
-        # (тот же формат, что /api/login возвращает браузеру).
-        token = self._web_viewer_token()
-        if not token:
-            self._last_error = (
-                "Веб-доступ не настроен (пользователи веб-сервера не заданы) - "
-                "браузерный вьювер krfb недоступен. Настройте веб-доступ "
-                "(Настройки - Веб-доступ)."
-            )
-            self._logger.error("KRFBService: no web users - browser viewer unavailable")
-            return False
-
         if sys.platform != "win32" and viewer == "krdc":
             # Принудительный krdc. Схема vnc (плагин VNC krdc принимает
             # только её; rfb-плагина не существует). Пароль в URL - krdc
@@ -817,12 +805,16 @@ class KRFBService(BaseService):
 
         # Браузерный вьювер: локальный веб-сервер с ?backend=krfb
         # (Windows всегда, Linux по выбору или как fallback).
+        import urllib.parse
         from src.utils.network.urls import web_base_url
+        from src.web.vnc_access import create_vnc_access
 
+        vt = create_vnc_access(device.iid)
+        base_url = web_base_url(config.app.web, "localhost")
         url = (
-            f"{web_base_url(config.app.web, 'localhost')}/vnc.html"
-            f"?iid={device.iid}&backend=krfb&view={view_flag}"
-            f"&token={token}&name={host}"
+            f"{base_url}/vnc.html"
+            f"?iid={urllib.parse.quote(str(device.iid))}&backend=krfb&view={view_flag}"
+            f"&vt={urllib.parse.quote(vt)}&name={urllib.parse.quote(host)}"
         )
         try:
             from src.utils.system.subprocess_env import open_url_in_browser
