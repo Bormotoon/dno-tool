@@ -46,6 +46,9 @@ class HostControlService(BaseService):
         "ssh_unlock": ("unlock_screen_ssh", False),
         "ssh_lock_input": ("lock_input_ssh", False),
         "ssh_unlock_input": ("unlock_input_ssh", False),
+        # Режим «Экзамен» (ограничение интернета и USB)
+        "exam_mode_on": ("enable_exam_mode", False),
+        "exam_mode_off": ("disable_exam_mode", False),
     }
 
     # Токен режима удалённого скрипта для каждого метода блокировки.
@@ -359,6 +362,62 @@ exit "$result"
     def unlock_input_ssh(self, host: str) -> bool:
         """Снять блокировку ввода; заблокированный экран продолжает держать ввод."""
         return self._run_session_lock(host, "unlock-input")
+
+    # ========== Режим экзамена (ограничение интернета и USB) ==========
+
+    @classmethod
+    def build_exam_mode_command(
+        cls, action: str, extra_ips: list[str] | None = None
+    ) -> str:
+        """Команда запуска ``remote_exam_mode.py`` в нужном режиме."""
+        import base64
+
+        from src.workers.remote_recording import resource_text
+
+        payload = base64.b64encode(
+            resource_text("remote_exam_mode.py").encode("utf-8")
+        ).decode("ascii")
+        ips_arg = ",".join(extra_ips or [])
+        loader = (
+            "import base64;s=base64.b64decode('" + payload + "');"
+            "exec(compile(s,'dno-exam-mode','exec'),"
+            "{'__name__':'__main__'})"
+        )
+        return f"python3 -I -c {shlex.quote(loader)} {action} {shlex.quote(ips_arg)}"
+
+    def _run_exam_mode(
+        self, host: str, action: str, extra_ips: list[str] | None = None
+    ) -> bool:
+        self._last_error = ""
+        self._last_error_detail = ""
+        if not host:
+            return False
+        cmd = self.build_exam_mode_command(action, extra_ips)
+        output, ok = self._exec_ssh(host, cmd, timeout=30)
+        lines = [line.strip() for line in (output or "").splitlines() if line.strip()]
+        marked = [
+            line[len("dno-exam:") :].strip()
+            for line in lines
+            if line.startswith("dno-exam:")
+        ]
+        short = marked[-1] if marked else (lines[-1] if lines else "нет ответа")
+        if ok and "ошибка" not in short.lower():
+            self._logger.info(f"HostControl: exam {action} {host}: {short}")
+            return True
+        self._last_error = short
+        self._last_error_detail = "\n".join(lines[-20:])
+        self._logger.warning(f"HostControl: exam {action} {host} failed: {short}")
+        return False
+
+    def enable_exam_mode(
+        self, host: str, extra_ips: list[str] | None = None
+    ) -> bool:
+        """Включить режим экзамена на хосте (изоляция интернета учеников + блокировка USB)."""
+        return self._run_exam_mode(host, "enable", extra_ips)
+
+    def disable_exam_mode(self, host: str) -> bool:
+        """Отключить режим экзамена на хосте (восстановить полный доступ)."""
+        return self._run_exam_mode(host, "disable")
 
     # ========== Вход через DBus (org.mos.auth, MOS/ROSA) ==========
 
