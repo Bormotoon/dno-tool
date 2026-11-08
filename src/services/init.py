@@ -80,6 +80,9 @@ def initialize_services(container: DIContainer = None) -> DIContainer:
     container.register(DeviceInfoService, DeviceInfoService, singleton=True)
     container.register(KdeService, KdeService, singleton=True)
 
+    from src.services.commands.scheduler_service import TaskSchedulerService
+    container.register(TaskSchedulerService, TaskSchedulerService, singleton=True)
+
     # HostInfoService — QObject-синглтон через фабрику (без __new__: PySide6
     # на Linux падает, если QObject-наследник переопределяет __new__).
     container.register_instance(HostInfoService, get_host_info_service())
