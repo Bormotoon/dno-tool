@@ -370,25 +370,20 @@ class CommandsPage(SetupPage):
                 QMessageBox.critical(self, "Ошибка", result["message"])
             return
 
-        tmp = tempfile.NamedTemporaryFile(
-            suffix=".json", delete=False, mode="w", encoding="utf-8"
-        )
-        json.dump(result["data"], tmp, ensure_ascii=False, indent=4)
-        tmp.close()
+        import tempfile
 
-        try:
-            asked = self._ask_command_import_mode(tmp.name)
+        with tempfile.TemporaryDirectory() as directory:
+            tmp_path = os.path.join(directory, "commands.json")
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(result["data"], f, ensure_ascii=False, indent=2)
+
+            asked = self._ask_command_import_mode(tmp_path)
             if asked is None:
                 return
             mode, resolution = asked
             success, message, _stats = self._command_service.import_commands_from_file(
-                tmp.name, mode=mode, resolution=resolution
+                tmp_path, mode=mode, resolution=resolution
             )
-        finally:
-            try:
-                os.unlink(tmp.name)
-            except OSError:
-                pass
 
         if success:
             self._loaded = True
