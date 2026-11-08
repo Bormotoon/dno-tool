@@ -1,5 +1,5 @@
 Name:           dno-tool
-Version:        0.5.9
+Version:        0.15.10
 Release:        1%{?dist}
 Summary:        Инструмент управления сетевыми устройствами для МОС/АЛЬТ Linux
 Group:          System/Configuration/Other
