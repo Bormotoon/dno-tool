@@ -146,6 +146,7 @@ class TerminalScreen:
         self.scroll_top = 0
         self.scroll_bottom = rows - 1
         self.scrollback: deque = deque(maxlen=2000)
+        self._scrollback_html_cache: deque = deque(maxlen=2000)
         self._state = "normal"  # normal|esc|csi|osc|osc_st|charset
         self._csi_buf = ""
         self._osc_buf = ""
@@ -225,16 +226,35 @@ class TerminalScreen:
         ``QTextDocument``, на которые опирается ``_place_cursor``
         (поиск по номеру блока = scrollback + cursor_row).
         """
+        palette_key = tuple(ansi_palette) if ansi_palette else None
         lines_html: list[str] = []
         # margin:0; padding:0 убирает межстрочные отступы <p> (~12px сверху/снизу),
         # иначе строки терминала выглядят двойными.
         para_style = "margin:0; padding:0; line-height:1; white-space:pre"
-        for line in self.scrollback:
-            if isinstance(line, list):
-                line = self._row_to_html(line, ansi_palette)
-            lines_html.append(
-                f"<p style='{para_style}'>{line if line else '&nbsp;'}</p>"
-            )
+
+        for idx, line in enumerate(self.scrollback):
+            if idx < len(self._scrollback_html_cache):
+                cached_pal, cached_html = self._scrollback_html_cache[idx]
+            else:
+                cached_pal, cached_html = None, ""
+
+            if cached_html and cached_pal == palette_key:
+                lines_html.append(cached_html)
+            else:
+                rendered_line = (
+                    self._row_to_html(line, ansi_palette)
+                    if isinstance(line, list)
+                    else line
+                )
+                rendered = (
+                    f"<p style='{para_style}'>{rendered_line if rendered_line else '&nbsp;'}</p>"
+                )
+                if idx < len(self._scrollback_html_cache):
+                    self._scrollback_html_cache[idx] = (palette_key, rendered)
+                else:
+                    self._scrollback_html_cache.append((palette_key, rendered))
+                lines_html.append(rendered)
+
         for row in self.screen:
             lines_html.append(
                 f"<p style='{para_style}'>"
@@ -328,6 +348,7 @@ class TerminalScreen:
             else:
                 trimmed = row[: len(plain)]
                 self.scrollback.append([list(cell) for cell in trimmed])
+            self._scrollback_html_cache.append((None, ""))
         blank = [" ", *_DEFAULT_ATTR]
         self.screen.insert(self.scroll_bottom, [list(blank) for _ in range(self.cols)])
 
@@ -358,6 +379,7 @@ class TerminalScreen:
         self._alt_active = True
         self._clear_screen()
         self.scrollback.clear()
+        self._scrollback_html_cache.clear()
         self.cursor_row = 0
         self.cursor_col = 0
 
@@ -488,6 +510,7 @@ class TerminalScreen:
             elif ch == "c":
                 self._clear_screen()
                 self.scrollback.clear()
+                self._scrollback_html_cache.clear()
                 self.cursor_row = 0
                 self.cursor_col = 0
                 self._cur_attr = _DEFAULT_ATTR
@@ -551,6 +574,7 @@ class TerminalScreen:
             n = parts[0] if parts and parts[0] else 0
             if n == 3:
                 self.scrollback.clear()
+                self._scrollback_html_cache.clear()
             elif n == 2:
                 self._clear_screen()
             elif n == 1:
