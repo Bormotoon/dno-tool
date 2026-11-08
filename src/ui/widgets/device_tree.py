@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 
 from src.domain.models.device import DeviceModel
 from src.domain.device_identity import DeviceKey, device_identity, device_key
+from src.domain.smart_filter import SmartHostQuery
 from src.ui.icons import _icon_from_key, qicon_from_path  # zip-темы: иконки из памяти
 from src.config import ICONS, config
 from src.utils.text.natural_sort import natural_key
@@ -1123,6 +1124,7 @@ class DeviceTreeView(QTreeView):
         # Применяется через setRowHidden (view-уровень): модель, сериализация,
         # чекбоксы и таймеры не затрагиваются.
         self._filter_text = ""
+        self._filter_query: Optional[SmartHostQuery] = None
         self.setModel(self._model)
 
         self.setup_ui()
@@ -3137,13 +3139,12 @@ class DeviceTreeView(QTreeView):
     def apply_filter(self, text: str) -> None:
         """Применить временный фильтр поиска к дереву (view-уровень).
 
-        text — подстрока (без учёта регистра). Устройство считается
-        совпавшим, если текст найден в имени или адресе (host). Папка
-        и секция ноды видимы, если совпадает их имя или есть совпавший
-        потомок. Совпавшие родители раскрываются, при пустом тексте
-        всё возвращается как было (видимость + свёрнутость).
+        Поддерживает как простой поиск по подстроке, так и умные предикаты
+        (is:online, is:offline, sudo:yes, mac:empty, os:mos13, user:student и др.).
         """
-        self._filter_text = (text or "").strip().casefold()
+        raw = (text or "").strip()
+        self._filter_text = raw.casefold()
+        self._filter_query = SmartHostQuery.parse(raw) if raw else None
         self._apply_filter_recursive(self._model.invisibleRootItem(), self.rootIndex())
 
     def filter_active(self) -> bool:
@@ -3151,15 +3152,39 @@ class DeviceTreeView(QTreeView):
         return bool(self._filter_text)
 
     def _item_matches_filter(self, item: CustomTreeItem) -> bool:
-        """Совпадает ли элемент (имя; для устройства ещё и адрес host)."""
+        """Совпадает ли элемент (имя; для устройства ещё и адрес host и предикаты)."""
         if item is None:
             return False
-        if self._filter_text in item.text().casefold():
+        if not self._filter_text:
             return True
+
         device = getattr(item, "device", None)
-        if device is not None and self._filter_text in (device.host or "").casefold():
-            return True
-        return False
+        if device is not None:
+            if self._filter_query is not None and (
+                self._filter_query.predicates or len(self._filter_query.text_terms) > 1
+            ):
+                info = None
+                try:
+                    from src.services.hosts.host_info_service import get_host_info_service
+
+                    info = get_host_info_service().get_snapshot(device.host)
+                except Exception:
+                    pass
+                return self._filter_query.matches_device(device, info)
+            if self._filter_text in item.text().casefold():
+                return True
+            if self._filter_text in (device.host or "").casefold():
+                return True
+            if self._filter_text in (device.mac_address or "").casefold():
+                return True
+            return False
+
+        if self._filter_query and self._filter_query.text_terms:
+            return all(
+                term in item.text().casefold()
+                for term in self._filter_query.text_terms
+            )
+        return self._filter_text in item.text().casefold()
 
     def _apply_filter_recursive(self, item: CustomTreeItem, parent_index) -> bool:
         """Обход дерева: скрыть/показать строки, вернуть видимость элемента.
