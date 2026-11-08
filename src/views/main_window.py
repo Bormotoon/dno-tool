@@ -129,6 +129,7 @@ from src.services import (
     HostControlService,
     KRFBService,
     NodeService,
+    TaskSchedulerService,
     get_host_info_service,
 )
 from src.services.hosts.host_info_service import TOOLTIP_MENU_FIELDS, STATIC_TOOLTIP_FIELDS
@@ -327,6 +328,10 @@ class MainWindow(QWidget):
         self.host_control_service = self.container.resolve(HostControlService)
         self.krfb_service = self.container.resolve(KRFBService)
         self.node_service = self.container.resolve(NodeService)
+        self.scheduler_service = self.container.resolve_optional(TaskSchedulerService)
+        if self.scheduler_service:
+            self.scheduler_service.set_executor(self._execute_scheduled_rule)
+            self.scheduler_service.start()
 
         # Получаем архитектурные компоненты (event_bus уже передан через конструктор)
         self.event_bus = self.container.resolve(EventBus)
@@ -1128,6 +1133,10 @@ class MainWindow(QWidget):
         cameras_action = make_action("menu_recording", "Камеры ЕЦХД", self)
         cameras_action.triggered.connect(self.show_cameras_dialog)
         tools_menu.addAction(cameras_action)
+
+        scheduler_action = make_action("menu_monitoring", "Расписание задач", self)
+        scheduler_action.triggered.connect(self.show_scheduler_dialog)
+        tools_menu.addAction(scheduler_action)
 
         topology_action = make_action("menu_topology", "Карта сети", self)
         topology_action.triggered.connect(self.show_topology_dialog)
@@ -4965,6 +4974,62 @@ class MainWindow(QWidget):
             self._topology_dialog.show()
         except Exception as e:
             logger.exception("show_topology_dialog: %s", e)
+
+    def show_scheduler_dialog(self) -> None:
+        """Открыть диалог планировщика задач."""
+        try:
+            from src.ui.dialogs.tools.scheduler_dialog import SchedulerDialog
+
+            if self.scheduler_service:
+                SchedulerDialog(self.scheduler_service, self).exec()
+            else:
+                QMessageBox.information(
+                    self,
+                    "Планировщик задач",
+                    "Сервис планировщика не инициализирован.",
+                )
+        except Exception as e:
+            logger.exception("show_scheduler_dialog: %s", e)
+
+    def _execute_scheduled_rule(self, rule) -> None:
+        """Выполнить задачу или действие по правилу расписания."""
+        try:
+            devices = self._resolve_scheduled_devices(rule)
+            if not devices:
+                logger.info(
+                    f"Планировщик: нет целевых устройств для правила '{rule.name}'"
+                )
+                return
+            if rule.action_type == "feature":
+                self._run_feature_on_devices(devices, rule.action_id)
+            elif rule.action_type == "task":
+                task = self.command_service.get_command_by_iid(rule.action_id)
+                if task:
+                    self.execute_command(devices, task)
+                else:
+                    logger.warning(
+                        f"Планировщик: задача '{rule.action_id}' не найдена в библиотеке"
+                    )
+        except Exception as e:
+            logger.exception("_execute_scheduled_rule: %s", e)
+
+    def _resolve_scheduled_devices(self, rule) -> list:
+        """Получить список устройств для правила расписания."""
+        if getattr(rule, "target_iids", None):
+            devs = []
+            for iid in rule.target_iids:
+                d = self.device_service.get_device_by_iid(iid)
+                if d:
+                    devs.append(d)
+            if devs:
+                return devs
+        if getattr(rule, "target_folder", None):
+            folder_devs = self.device_service.get_devices_by_folder(rule.target_folder)
+            if folder_devs:
+                return folder_devs
+        if hasattr(self, "listview"):
+            return self.listview.get_all_devices()
+        return []
 
     def show_ffmpeg_dialog(self) -> None:
         """Открыть диагностику медиабиблиотек и кодировщиков GPU."""
