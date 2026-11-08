@@ -39,9 +39,12 @@ function Invoke-Wsl([string[]]$Command, [switch]$CaptureOutput) {
 }
 
 # Изменение компонентов Windows требует административного токена.
-if ([IO.Path]::GetFullPath($InstallPath) -ne 'D:\WSL\dno-build') {
-    throw 'Для этого стенда предусмотрен только D:\WSL\dno-build.'
+$ResolvedInstallPath = [IO.Path]::GetFullPath($InstallPath)
+$InstallParent = Split-Path -Path $ResolvedInstallPath -Parent
+if (-not $InstallParent) {
+    throw "Укажите полный путь к подкаталогу для установки WSL: $InstallPath"
 }
+$SwapPath = (Join-Path $InstallParent 'dno-build-swap.vhdx').Replace('\', '\\')
 $Identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 if (-not ([Security.Principal.WindowsPrincipal]$Identity).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     $LogFile = Join-Path $StateDir ('setup-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '.log')
@@ -88,7 +91,13 @@ if ($Config) {
     Copy-Item -LiteralPath $ConfigPath -Destination (Join-Path $StateDir ('wslconfig-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.bak'))
 }
 # Остальные секции и настройки пользователя сохраняются.
-$Values = [ordered]@{memory='12GB'; processors='8'; swap='8GB'; swapFile='D:\\WSL\\dno-build-swap.vhdx'; defaultVhdSize='80GB'}
+$Values = [ordered]@{
+    memory         = '12GB'
+    processors     = '8'
+    swap           = '8GB'
+    swapFile       = $SwapPath
+    defaultVhdSize = '80GB'
+}
 if ($Config -notmatch '(?im)^\[wsl2\]\s*$') { $Config += "`n[wsl2]`n" }
 $Config = [regex]::Replace($Config, '(?ims)(^\[wsl2\]\s*\r?\n)(.*?)(?=^\[|\z)', {
     param($Match)
