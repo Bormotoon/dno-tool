@@ -633,6 +633,20 @@ class ControlToolbar(BaseDeviceToolbar):
                     "Выключить питание",
                 ),
             ],
+            [  # режим «Экзамен» (изоляция интернета учеников + блокировка USB)
+                (
+                    "exam_mode_on",
+                    "menu_monitoring",
+                    "Включить режим «Экзамен» (изоляция сети и USB)",
+                    "Режим «Экзамен» вкл",
+                ),
+                (
+                    "exam_mode_off",
+                    "menu_tools",
+                    "Отключить режим «Экзамен» (восстановить доступ)",
+                    "Режим «Экзамен» выкл",
+                ),
+            ],
         ]
         for gi, group in enumerate(control_groups):
             if gi > 0:

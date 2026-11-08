@@ -209,6 +209,8 @@ _FEATURE_LABELS = {
     "ssh_unlock_input": "Разблокировка ввода (SSH)",
     "krfb_password": "Смена пароля VNC",
     "krfb_restart": "Перезапуск VNC",
+    "exam_mode_on": "Режим «Экзамен» вкл",
+    "exam_mode_off": "Режим «Экзамен» выкл",
 }
 
 
