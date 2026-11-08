@@ -15,6 +15,7 @@ import re
 import tempfile
 import time
 import uuid
+import zlib
 from collections import deque
 from threading import RLock
 from typing import Any, Dict, List, Optional, Tuple
@@ -31,6 +32,26 @@ from src.config import (
 from src.logger import logger
 from src.utils.filesystem.fs_utils import ensure_user_owned
 
+
+def _fast_clone(value: Any) -> Any:
+    """Быстрое глубокое копирование JSON-структур (dict/list/примитивы) без оверхеда _fast_clone."""
+    t = type(value)
+    if t is dict:
+        return {k: _fast_clone(v) for k, v in value.items()}
+    if t is list:
+        return [_fast_clone(item) for item in value]
+    return value
+
+
+def _pack_history_entry(entry: dict[str, Any]) -> bytes:
+    raw = json.dumps(entry, ensure_ascii=False).encode("utf-8")
+    return zlib.compress(raw, level=1)
+
+
+def _unpack_history_entry(blob: bytes | dict[str, Any]) -> dict[str, Any]:
+    if isinstance(blob, dict):
+        return blob
+    return json.loads(zlib.decompress(blob).decode("utf-8"))
 
 
 def _same_path(first: str, second: str) -> bool:
@@ -234,7 +255,7 @@ class DataStore(QObject):
                     if "host" in node and "name" in node:
                         if node.get("iid") == op_data.get("iid"):
                             node.clear()
-                            node.update(copy.deepcopy(op_data))
+                            node.update(_fast_clone(op_data))
                             return True
                         return False
                     for value in node.values():
@@ -269,7 +290,7 @@ class DataStore(QObject):
                         if destination is None:
                             destination = []
                             self._hosts_data_raw.append({folder: destination})
-                    destination.append(copy.deepcopy(op_data))
+                    destination.append(_fast_clone(op_data))
             else:
                 _find_update(self._hosts_data_raw)
         except Exception as e:
@@ -408,7 +429,7 @@ class DataStore(QObject):
 
                 if has_groups:
                     # Это структура с группами
-                    self._hosts_data_raw = copy.deepcopy(new_data)
+                    self._hosts_data_raw = _fast_clone(new_data)
                     # Извлекаем плоский список
                     self._hosts_data = []
                     self._extract_hosts_recursive(
@@ -416,7 +437,7 @@ class DataStore(QObject):
                     )
                 else:
                     # Это плоский список
-                    self._hosts_data = copy.deepcopy(new_data)
+                    self._hosts_data = _fast_clone(new_data)
                     self._hosts_data_raw = []  # Очищаем raw если данные плоские
 
                 # Перестроить индексы по iid (присвоить iid новым записям без него)
@@ -435,8 +456,8 @@ class DataStore(QObject):
     def setup_snapshot(self):
         """Independent in-memory baseline; never re-read potentially stale files."""
         with self._lock:
-            return (copy.deepcopy(self._hosts_data_raw or self._hosts_data),
-                    copy.deepcopy(self._commands_data))
+            return (_fast_clone(self._hosts_data_raw or self._hosts_data),
+                    _fast_clone(self._commands_data))
 
     def commit_setup_snapshot(self, baseline, hosts, commands, persist):
         """Validate and persist before publishing either new model."""
@@ -465,8 +486,8 @@ class DataStore(QObject):
             self._commands_data, self._tasks_by_iid = commands, tasks
             self._rebuild_hosts_iid_index()
             self._stats["writes"] += 1
-        self._notify_change("hosts", "set", copy.deepcopy(hosts))
-        self._notify_change("commands", "set", copy.deepcopy(commands))
+        self._notify_change("hosts", "set", _fast_clone(hosts))
+        self._notify_change("commands", "set", _fast_clone(commands))
 
     def update_host(
         self, host_data: Dict, *, persist: bool = False
@@ -505,22 +526,22 @@ class DataStore(QObject):
 
             operation = "update" if existing_idx is not None else "add"
             if persist:
-                previous_hosts = copy.deepcopy(self._hosts_data)
-                previous_raw = copy.deepcopy(self._hosts_data_raw)
+                previous_hosts = _fast_clone(self._hosts_data)
+                previous_raw = _fast_clone(self._hosts_data_raw)
 
             # После set_hosts_data плоский список может не иметь raw-зеркала.
             # Восстанавливаем его ДО изменения, иначе первая новая папка
             # вытеснит прежние хосты из hosts.json и снимков дерева.
             if not self._hosts_data_raw and self._hosts_data:
-                self._hosts_data_raw = copy.deepcopy(self._hosts_data)
+                self._hosts_data_raw = _fast_clone(self._hosts_data)
 
             if existing_idx is not None:
-                old_data = copy.deepcopy(self._hosts_data[existing_idx])
+                old_data = _fast_clone(self._hosts_data[existing_idx])
                 # Сохраняем iid существующей записи при update
                 if "iid" not in host_data and "iid" in old_data:
                     host_data["iid"] = old_data["iid"]
                 self._hosts_data[existing_idx].update(host_data)
-                new_data = copy.deepcopy(self._hosts_data[existing_idx])
+                new_data = _fast_clone(self._hosts_data[existing_idx])
                 # Обновить индекс
                 self._hosts_by_iid[new_data.get("iid")] = self._hosts_data[existing_idx]
                 logger.debug(f"DataStore: Updated host {host_data.get('host')}")
@@ -528,9 +549,9 @@ class DataStore(QObject):
                 # Новая запись — генерируем iid если нет
                 if "iid" not in host_data or not host_data["iid"]:
                     host_data["iid"] = uuid.uuid4().hex
-                self._hosts_data.append(copy.deepcopy(host_data))
+                self._hosts_data.append(_fast_clone(host_data))
                 old_data = {}
-                new_data = copy.deepcopy(host_data)
+                new_data = _fast_clone(host_data)
                 self._hosts_by_iid[new_data["iid"]] = self._hosts_data[-1]
                 logger.debug(f"DataStore: Added host {host_data.get('host')}")
 
@@ -588,7 +609,7 @@ class DataStore(QObject):
 
             removed = []
             for i in reversed(indices_to_remove):
-                removed.append(copy.deepcopy(self._hosts_data[i]))
+                removed.append(_fast_clone(self._hosts_data[i]))
                 # Удалить из индекса
                 iid = self._hosts_data[i].get("iid")
                 if iid and iid in self._hosts_by_iid:
@@ -620,9 +641,9 @@ class DataStore(QObject):
                 logger.debug(f"DataStore: Host iid={iid} not found for deletion")
                 return False
             if persist:
-                previous_hosts = copy.deepcopy(self._hosts_data)
-                previous_raw = copy.deepcopy(self._hosts_data_raw)
-            removed = copy.deepcopy(self._hosts_data[idx])
+                previous_hosts = _fast_clone(self._hosts_data)
+                previous_raw = _fast_clone(self._hosts_data_raw)
+            removed = _fast_clone(self._hosts_data[idx])
             del self._hosts_data[idx]
             self._hosts_by_iid.pop(iid, None)
             self._sync_hosts_raw_iids()
@@ -652,7 +673,7 @@ class DataStore(QObject):
             for h in self._hosts_data:
                 if h.get("host") == host:
                     if port is None or h.get("port") == port:
-                        return copy.deepcopy(h)
+                        return _fast_clone(h)
             return None
 
     def find_host_by_iid(self, iid: str) -> Optional[Dict]:
@@ -660,21 +681,21 @@ class DataStore(QObject):
         with self._lock:
             self._stats["reads"] += 1
             h = self._hosts_by_iid.get(iid)
-            return copy.deepcopy(h) if h is not None else None
+            return _fast_clone(h) if h is not None else None
 
     def find_task_by_iid(self, iid: str) -> Optional[Dict]:
         """Найти задачу по iid (первичный метод поиска)."""
         with self._lock:
             self._stats["reads"] += 1
             t = self._tasks_by_iid.get(iid)
-            return copy.deepcopy(t) if t is not None else None
+            return _fast_clone(t) if t is not None else None
 
     def get_hosts_by_folder(self, folder_path: str) -> List[Dict]:
         """Получить все хосты в папке"""
         with self._lock:
             self._stats["reads"] += 1
             return [
-                copy.deepcopy(h)
+                _fast_clone(h)
                 for h in self._hosts_data
                 if h.get("folder", "") == folder_path
             ]
@@ -685,7 +706,7 @@ class DataStore(QObject):
         """Получить независимую копию дерева задач (потокобезопасно)."""
         with self._lock:
             self._stats["reads"] += 1
-            return copy.deepcopy(self._commands_data)
+            return _fast_clone(self._commands_data)
 
     def get_commands_count(self) -> int:
         """Получить количество элементов верхнего уровня дерева задач."""
@@ -754,7 +775,7 @@ class DataStore(QObject):
                 self._stats["errors"] += 1
                 return False
             self._commands_error = ""
-            self._commands_data = copy.deepcopy(new_data)
+            self._commands_data = _fast_clone(new_data)
             self._stats["writes"] += 1
 
             # Перестроить индекс tasks по iid (присвоить iid новым записям)
@@ -790,7 +811,7 @@ class DataStore(QObject):
                 if not isinstance(imported_data, list):
                     self._stats["errors"] += 1
                     return False, {}
-                merged = copy.deepcopy(self._commands_data)
+                merged = _fast_clone(self._commands_data)
                 stats = merge_command_trees(merged, imported_data, resolution=resolution)
                 self._commands_data = merged
                 self._stats["writes"] += 1
@@ -940,7 +961,7 @@ class DataStore(QObject):
             if not self._operation_history:
                 return None
 
-            operation = self._operation_history.pop()
+            operation = _unpack_history_entry(self._operation_history.pop())
 
             if operation["type"] == "hosts":
                 if operation["action"] == "add":
@@ -1015,7 +1036,7 @@ class DataStore(QObject):
     def get_history(self, limit: int = 10) -> List[Dict]:
         """Получить последние ``limit`` операций из истории."""
         with self._lock:
-            return list(self._operation_history)[-limit:]
+            return [_unpack_history_entry(item) for item in list(self._operation_history)[-limit:]]
 
     def clear_history(self) -> None:
         """Очистить историю операций."""
@@ -1185,14 +1206,16 @@ class DataStore(QObject):
     ):
         """Добавить операцию в историю"""
         self._operation_history.append(
-            {
-                "type": op_type,
-                "action": action,
-                "old_data": old_data,
-                "new_data": new_data,
-                "index": index,
-                "timestamp": time.time(),
-            }
+            _pack_history_entry(
+                {
+                    "type": op_type,
+                    "action": action,
+                    "old_data": old_data,
+                    "new_data": new_data,
+                    "index": index,
+                    "timestamp": time.time(),
+                }
+            )
         )
 
     def get_host_revision(self, iid: str) -> int | None:
