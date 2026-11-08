@@ -1346,24 +1346,20 @@ class MainWindow(QWidget):
 
         import tempfile
 
-        tmp = tempfile.NamedTemporaryFile(
-            suffix=".json", delete=False, mode="w", encoding="utf-8"
-        )
-        json.dump(result["data"], tmp, ensure_ascii=False, indent=4)
-        tmp.close()
+        with tempfile.TemporaryDirectory() as directory:
+            tmp_path = os.path.join(directory, "commands.json")
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(result["data"], f, ensure_ascii=False, indent=2)
 
-        try:
-            asked = self._ask_command_import_mode(tmp.name)
+            asked = self._ask_command_import_mode(tmp_path)
             if asked is None:
                 self._set_status("Готово", "idle")
                 return
             mode, resolution = asked
 
             success, message, _stats = self.command_service.import_commands_from_file(
-                tmp.name, mode=mode, resolution=resolution
+                tmp_path, mode=mode, resolution=resolution
             )
-        finally:
-            os.unlink(tmp.name)
 
         if success:
             commands = self.command_service.get_all_commands()
