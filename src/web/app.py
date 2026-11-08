@@ -75,6 +75,8 @@ from .duplex import run_duplex
 from .auth import (
     require_auth,
     require_auth_or_token,
+    issue_session_token,
+    resolve_session_token,
     RequestUser,
     _basic_credentials,
     _decode_token,
@@ -232,6 +234,10 @@ def require_auth_or_token_sync(request: "Request") -> RequestUser:
         request.query_params.get("token"),
         request.cookies.get("dno-tool_token"),
     ):
+        resolved = resolve_session_token(value)
+        if resolved:
+            owner, sid = resolved
+            return RequestUser(username=owner, session_id=_extract_session(request) or sid)
         creds = _decode_token(value) if value else None
         owner = authenticate(*creds) if creds else None
         if owner is not None:
@@ -632,12 +638,11 @@ def create_app() -> FastAPI:
         )
         # Создаём сессию (привязка выбранных хостов к вкладке браузера).
         st = _session_store.create(owner=owner) if _session_store else None
-        token = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode(
-            "ascii"
-        )
+        session_id = st.id if st else None
+        token = issue_session_token(owner=owner, session_id=session_id)
         return {
             "username": owner,
-            "session_id": st.id if st else None,
+            "session_id": session_id,
             "token": token,
             "multi_user": True,
         }
@@ -1612,14 +1617,19 @@ def create_app() -> FastAPI:
         # не отправляют Basic-заголовок при WebSocket. Проверка — локальные
         # пользователи, затем LDAP (multi-user).
         token = ws.query_params.get("token")
-        creds = _decode_token(token) if token else None
-        username = await authenticate_async(*creds) if creds else None
+        resolved = resolve_session_token(token)
+        if resolved:
+            username, sid = resolved
+        else:
+            creds = _decode_token(token) if token else None
+            username = await authenticate_async(*creds) if creds else None
+            sid = None
         if username is None:
             await ws.close(code=4401)
             return
 
         # owner = username (многопользовательский режим).
-        session_id = ws.query_params.get("session")
+        session_id = ws.query_params.get("session") or sid
         owner = username
 
         # job_id + last_seq — переподключение к существующему заданию (refresh).
@@ -2014,8 +2024,12 @@ def create_app() -> FastAPI:
         logger.info(f"VNC WS endpoint called: iid={iid}")
 
         token = ws.query_params.get("token")
-        creds = _decode_token(token) if token else None
-        username = await authenticate_async(*creds) if creds else None
+        resolved = resolve_session_token(token)
+        if resolved:
+            username, _ = resolved
+        else:
+            creds = _decode_token(token) if token else None
+            username = await authenticate_async(*creds) if creds else None
         if username is None:
             # Альтернатива: capability-токен ноды (?vt=) — федерация нод
             # (node_vnc_url строит vnc.html?...&vt=<capability>).

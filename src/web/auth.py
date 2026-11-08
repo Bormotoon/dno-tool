@@ -15,6 +15,9 @@ Token в query/cookie остаётся base64(user:pass) для обратной
 import hmac
 import base64
 import ipaddress
+import secrets
+import time
+import threading
 from dataclasses import dataclass
 from typing import Optional
 
@@ -22,6 +25,50 @@ from fastapi import HTTPException, Request, status
 
 from src.config import config
 from src.logger import logger
+
+_BEARER_LOCK = threading.Lock()
+# token -> (owner, session_id, expires_at)
+_BEARER_TOKENS: dict[str, tuple[str, str | None, float]] = {}
+_BEARER_TTL_SEC = 24 * 3600
+_MAX_BEARER_TOKENS = 2048
+
+
+def issue_session_token(owner: str, session_id: str | None = None, ttl_sec: float = _BEARER_TTL_SEC) -> str:
+    """Выпустить криптостойкий непрозрачный токен сессии (без пароля внутри)."""
+    now = time.monotonic()
+    token = "st_" + secrets.token_urlsafe(32)
+    with _BEARER_LOCK:
+        if len(_BEARER_TOKENS) >= _MAX_BEARER_TOKENS:
+            expired = [k for k, v in _BEARER_TOKENS.items() if v[2] <= now]
+            for k in expired:
+                _BEARER_TOKENS.pop(k, None)
+            if len(_BEARER_TOKENS) >= _MAX_BEARER_TOKENS:
+                oldest = min(_BEARER_TOKENS, key=lambda k: _BEARER_TOKENS[k][2])
+                _BEARER_TOKENS.pop(oldest, None)
+        _BEARER_TOKENS[token] = (owner, session_id, now + ttl_sec)
+    return token
+
+
+def resolve_session_token(token: str | None) -> tuple[str, str | None] | None:
+    """Проверить непрозрачный токен `st_...` и вернуть (owner, session_id) или None."""
+    if not token or not token.startswith("st_"):
+        return None
+    now = time.monotonic()
+    with _BEARER_LOCK:
+        entry = _BEARER_TOKENS.get(token)
+        if not entry:
+            return None
+        owner, session_id, expires_at = entry
+        if expires_at <= now:
+            _BEARER_TOKENS.pop(token, None)
+            return None
+        return owner, session_id
+
+
+def revoke_session_token(token: str | None) -> None:
+    if token:
+        with _BEARER_LOCK:
+            _BEARER_TOKENS.pop(token, None)
 
 
 @dataclass
@@ -268,6 +315,12 @@ async def require_auth_or_token(request: Request) -> RequestUser:
     # Basic-заголовок, затем token в query (для <img>), затем cookie.
     token = request.query_params.get("token")
     cookie_token = request.cookies.get("dno-tool_token")
+    for t in (token, cookie_token):
+        resolved = resolve_session_token(t)
+        if resolved:
+            owner, sid = resolved
+            return RequestUser(username=owner, session_id=_extract_session(request) or sid)
+
     for creds in (
         _basic_credentials(request),
         _decode_token(token) if token else None,

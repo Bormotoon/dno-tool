@@ -17,7 +17,7 @@ from src.logger import logger
 from src.utils.filesystem.sftp_files import OperationControl, describe_ssh_failure
 from src.workers.tracked_pool import TrackedThreadPoolExecutor
 
-from .auth import _decode_token, authenticate_async, is_secure_transport
+from .auth import _decode_token, authenticate_async, is_secure_transport, resolve_session_token
 
 MAX_SESSIONS = 8
 MAX_DIMENSION = 500
@@ -202,8 +202,12 @@ def install_terminal_routes(
     @app.websocket("/ws/terminal/{iid}")
     async def terminal(ws: WebSocket, iid: str) -> None:
         token = ws.query_params.get("token")
-        creds = _decode_token(token) if token else None
-        owner = await authenticate_async(*creds) if creds else None
+        resolved = resolve_session_token(token)
+        if resolved:
+            owner, _ = resolved
+        else:
+            creds = _decode_token(token) if token else None
+            owner = await authenticate_async(*creds) if creds else None
         if owner is None:
             await ws.close(code=CLOSE_AUTH)
             return
