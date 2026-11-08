@@ -44,6 +44,7 @@ from src.domain.device_info import (
 from src.domain.models.device import DeviceModel
 from src.logger import logger
 from src.services.hosts.device_info import DeviceInfoService, get_device_info_service
+from src.services.hosts.device_info.baseline_store import HardwareBaselineStore
 from src.services.hosts.device_info.catalog import (
     CATEGORY_ICONS,
     INFO_CATEGORIES,
@@ -79,6 +80,7 @@ class DeviceInfoDialog(QDialog):
         self._sorts: dict[str, tuple[int, Qt.SortOrder]] = {}
         self._shown_key = ""
         self._category_items: dict[str, QTreeWidgetItem] = {}
+        self.baseline_store = HardwareBaselineStore()
         self.setWindowTitle(f"Информация об устройстве — {device.name}")
         self.setSizeGripEnabled(True)
         self._column_fit_timer = QTimer(self)
@@ -155,6 +157,11 @@ class DeviceInfoDialog(QDialog):
         self.category_note.setWordWrap(True)
         note_bar = QHBoxLayout()
         note_bar.addWidget(self.category_note, 1)
+        self.baseline_warning_btn = QPushButton("⚠️ Отличия от эталона")
+        self.baseline_warning_btn.setStyleSheet("color: #d9534f; font-weight: bold;")
+        self.baseline_warning_btn.hide()
+        self.baseline_warning_btn.clicked.connect(self._show_baseline_diff_dialog)
+        note_bar.addWidget(self.baseline_warning_btn)
         self.details_btn = QToolButton()
         self.details_btn.setText("Диагностика")
         self.details_btn.setCheckable(True)
@@ -176,6 +183,9 @@ class DeviceInfoDialog(QDialog):
         self.refresh_btn = QPushButton("Обновить")
         self.refresh_btn.clicked.connect(self._refresh_or_stop)
         bottom.addWidget(self.refresh_btn)
+        self.baseline_btn = QPushButton("Зафиксировать как эталон")
+        self.baseline_btn.clicked.connect(self._save_baseline)
+        bottom.addWidget(self.baseline_btn)
         self.save_btn = QPushButton("Сохранить отчёт…")
         self.save_btn.setIcon(_icon_from_key("menu_save"))
         self.save_btn.clicked.connect(self._save_report)
@@ -576,6 +586,8 @@ class DeviceInfoDialog(QDialog):
         logger.debug(
             f"DeviceInfo render rows={len(rows)} elapsed_sec={time.monotonic() - start:.4f}"
         )
+        if not busy and snapshot:
+            self._check_baseline_changes()
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         if (
@@ -608,6 +620,82 @@ class DeviceInfoDialog(QDialog):
             self._finish_close()
         else:
             self._render()
+            self._check_baseline_changes()
+
+    def _save_baseline(self) -> None:
+        """Зафиксировать текущий снимок конфигурации как эталон."""
+        snapshot = self._display_snapshot()
+        if not snapshot:
+            QMessageBox.warning(self, "Эталон", "Снимок устройства ещё не получен.")
+            return
+        self.baseline_store.save_baseline(snapshot)
+        self.baseline_warning_btn.hide()
+        QMessageBox.information(
+            self,
+            "Эталон сохранён",
+            f"Конфигурация устройства '{snapshot.name}' успешно зафиксирована как эталон.",
+        )
+
+    def _check_baseline_changes(self) -> None:
+        """Проверить текущий снимок на расхождения с эталоном оборудования."""
+        snapshot = self._display_snapshot()
+        if not snapshot:
+            self.baseline_warning_btn.hide()
+            return
+        diffs = self.baseline_store.diff_against_baseline(snapshot, hardware_only=True)
+        if diffs:
+            self.baseline_warning_btn.setText(f"⚠️ Отличия от эталона ({len(diffs)})")
+            self.baseline_warning_btn.show()
+        else:
+            self.baseline_warning_btn.hide()
+
+    def _show_baseline_diff_dialog(self) -> None:
+        """Показать диалог различий между эталоном и текущим снимком оборудования."""
+        snapshot = self._display_snapshot()
+        if not snapshot:
+            return
+        baseline = self.baseline_store.load_baseline(snapshot.device_key)
+        if not baseline:
+            return
+        from src.services.hosts.device_info.compare import compare_snapshots
+
+        dialog = QDialog(self)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.setWindowTitle("Отличия от эталонной конфигурации")
+        dialog.setSizeGripEnabled(True)
+        layout = QVBoxLayout(dialog)
+        note = QLabel(
+            f"Эталон: {baseline.name}, сохранён {baseline.finished_at or baseline.started_at}\n"
+            f"Текущий снимок: {snapshot.name}, получен {snapshot.started_at}"
+        )
+        note.setTextFormat(Qt.TextFormat.PlainText)
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        table = QTableView(dialog)
+        model = DeviceInfoTableModel(table)
+        diffs = self.baseline_store.diff_against_baseline(snapshot, hardware_only=True)
+        model.set_rows(
+            ("Раздел", "Поле / строка", "Эталон", "Сейчас", "Изменение"),
+            tuple(
+                tuple(InfoCell(value, value) for value in row)
+                for row in diffs
+            ),
+        )
+        proxy = DeviceInfoFilter(table)
+        proxy.setSourceModel(model)
+        table.setModel(proxy)
+        table.setSortingEnabled(True)
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(table)
+        button = QPushButton("Закрыть", dialog)
+        button.clicked.connect(dialog.close)
+        layout.addWidget(button)
+        available = self.screen().availableGeometry()
+        dialog.resize(
+            min(1000, available.width() - 20), min(600, available.height() - 40)
+        )
+        dialog.show()
 
     def _compare(self) -> None:
         from src.services.hosts.device_info.compare import compare_snapshots
