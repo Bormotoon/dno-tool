@@ -328,6 +328,10 @@ class MainWindow(QWidget):
         self.krfb_service = self.container.resolve(KRFBService)
         self.node_service = self.container.resolve(NodeService)
 
+        from src.ui.controllers.node_tree_controller import NodeTreeController
+
+        self._node_tree_controller = NodeTreeController(self)
+
         # Получаем архитектурные компоненты (event_bus уже передан через конструктор)
         self.event_bus = self.container.resolve(EventBus)
         self.dialog_manager = self.container.resolve(DialogManager)
@@ -1460,87 +1464,14 @@ class MainWindow(QWidget):
         self._nodes_reload_sections()
 
     def _node_stop_trackers(self, node_iid: str) -> None:
-        """Остановить per-host таймеры (статусы + миниатюры) одной ноды.
-
-        Вызывается при скрытии/выключении/удалении ноды. Подписки миниатюр
-        сохраняются (при возврате ноды пересоздадутся); для статусов
-        sync-механизм сам уберёт лишних при следующем синке секции.
-        """
-        try:
-            from src.workers.node.status import get_node_status_manager
-
-            get_node_status_manager().stop_node(node_iid)
-        except Exception as e:
-            logger.debug(f"MainWindow: node status stop_node {node_iid}: {e}")
-        try:
-            from src.workers.node.thumbnails import get_node_thumbnail_manager
-
-            get_node_thumbnail_manager().stop_node(node_iid)
-        except Exception as e:
-            logger.debug(f"MainWindow: node thumbnails stop_node {node_iid}: {e}")
+        """Остановить per-host таймеры (статусы + миниатюры) одной ноды."""
+        if hasattr(self, "_node_tree_controller"):
+            self._node_tree_controller.stop_trackers(node_iid)
 
     def _nodes_reload_sections(self) -> None:
-        """Перечитать ноды из конфига и синхронизировать секции дерева.
-
-        Тумблер «Ноды» выключен (show_nodes=False) — клиенты не запускаются.
-        """
-        if not hasattr(self, "node_service") or self.node_service is None:
-            return
-        from src.ui.widgets.device_tree import (
-            NODE_SECTION_DATAROLE,
-            DEVICE_NODE_DATAROLE,
-        )
-
-        show_nodes = bool(getattr(self.treeview, "show_nodes", False))
-
-        known = {r.iid: r for r in self.node_service.get_nodes()}
-        # Удалить секции нод, которых больше нет в конфиге или выключены.
-        # Локальная секция (LOCAL_NODE_IID) не удаляется — это хосты машины.
-        from src.ui.widgets.device_tree import LOCAL_NODE_IID
-
-        root = self.treeview._model.invisibleRootItem()
-        for i in reversed(range(root.rowCount())):
-            child = root.child(i)
-            if not bool(child.data(NODE_SECTION_DATAROLE)):
-                continue
-            nid = child.data(DEVICE_NODE_DATAROLE) or ""
-            if nid == LOCAL_NODE_IID:
-                continue
-            rec = known.get(nid)
-            if (
-                rec is None
-                or not rec.autoconnect
-                or not config.app.nodes.show_in_tree
-                or not show_nodes
-            ):
-                self._node_stop_trackers(nid)
-                self.node_service.stop_client(nid)
-                self.treeview.remove_node_section(nid)
-        # Создать секции и запустить клиентов для активных нод
-        if config.app.nodes.show_in_tree and show_nodes:
-            for rec in known.values():
-                if rec.autoconnect:
-                    self.treeview.get_or_create_node_section(
-                        rec.iid, rec.name or rec.host
-                    )
-        if show_nodes:
-            for rec in known.values():
-                client = self.node_service.get_client(rec.iid)
-                if rec.autoconnect:
-                    if client is not None and (
-                        not client.isRunning()
-                        or (client._host, client._port, client._pubkey)
-                        != (rec.host, rec.port, rec.pubkey)
-                    ):
-                        self._node_stop_trackers(rec.iid)
-                        self.node_service.stop_client(rec.iid)
-                        client = None
-                    if client is None:
-                        self._node_start_client(rec)
-                else:
-                    if client is not None:
-                        self._node_stop_trackers(rec.iid)
-                        self.node_service.stop_client(rec.iid)
+        """Перечитать ноды из конфига и синхронизировать секции дерева."""
+        if hasattr(self, "_node_tree_controller"):
+            self._node_tree_controller.reload_sections()
 
     def show_veyon_settings_dialog(self):
         """Показать диалог настроек Veyon"""
@@ -3937,66 +3868,14 @@ class MainWindow(QWidget):
     # ========== Ноды (федерация инстансов) ==========
 
     def _nodes_init(self) -> None:
-        """Подключиться ко всем включённым нодам и создать их секции в дереве.
-
-        Вызывается после load_initial_data. Для каждой ноды: секция в дереве
-        (пустая плейсхолдер), запуск NodeClientWorker (handshake + polling).
-        Тумблер «Ноды» выключен (show_nodes=False) — клиенты не запускаются
-        (скрытые ноды не опрашиваются).
-        """
-        if not hasattr(self, "node_service") or self.node_service is None:
-            return
-        show_nodes = bool(getattr(self.treeview, "show_nodes", False))
-        nodes = [
-            r
-            for r in self.node_service.get_nodes()
-            if getattr(r, "autoconnect", True)
-        ]
-        if not nodes:
-            return
-        for rec in nodes:
-            # Секция в дереве (сразу, до handshake — чтобы пользователь видел)
-            if config.app.nodes.show_in_tree and show_nodes:
-                try:
-                    self.treeview.get_or_create_node_section(
-                        rec.iid, rec.name or rec.host
-                    )
-                except Exception as e:
-                    logger.debug(f"MainWindow: node section {rec.iid}: {e}")
-            if show_nodes:
-                self._node_start_client(rec)
+        """Подключиться ко всем включённым нодам и создать их секции в дереве."""
+        if hasattr(self, "_node_tree_controller"):
+            self._node_tree_controller.init_nodes()
 
     def _node_start_client(self, rec) -> None:
         """Запустить NodeClientWorker для ноды и подключить сигналы."""
-        try:
-            from src.workers.node import NodeClientWorker
-
-            # Уже запущен?
-            existing = self.node_service.get_client(rec.iid)
-            if existing is not None:
-                try:
-                    if existing.isRunning():
-                        return
-                except Exception:
-                    pass
-
-            # parent=None: владение клиентом у NodeService (реестр _clients),
-            # не у MainWindow — иначе при закрытии окна QThread уничтожается
-            # пока поток ещё работает ("Destroyed while thread is running").
-            client = NodeClientWorker(
-                node_iid=rec.iid,
-                host=rec.host,
-                port=rec.port,
-                pubkey=rec.pubkey,
-                node_service=self.node_service,
-            )
-            self.node_service.set_client(rec.iid, client)
-            client.hosts_updated.connect(self._on_node_hosts_updated)
-            client.node_online.connect(self._on_node_online)
-            client.node_name_updated.connect(self._on_node_name_updated)
-            client.start()
-        except Exception as e:
-            logger.error(f"MainWindow: не удалось запустить NodeClient {rec.iid}: {e}")
+        if hasattr(self, "_node_tree_controller"):
+            self._node_tree_controller.start_client(rec)
 
     def _on_node_hosts_updated(self, node_iid: str, tree: list) -> None:
         """Дерево хостов ноды обновилось — перестроить секцию в дереве."""
