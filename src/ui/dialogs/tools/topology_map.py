@@ -1568,7 +1568,7 @@ class TopologyMapDialog(QDialog):
         self._link_chain(destination, chain, self.route_source.get(destination) or "")
 
     def _ensure_local(self, src_ip: str) -> None:
-        """??????? ??? ???????? ???? ????????? ? ?????? ?????????????? ????????."""
+        """Создать или обновить узел оператора с адресом фактического маршрута."""
         scene = self.view.network_scene
         existing = scene.nodes.get(src_ip)
         if existing is None:
@@ -1580,7 +1580,7 @@ class TopologyMapDialog(QDialog):
         self._refresh_device_node(src_ip)
 
     def _ensure_route_nodes(self, owner: str, route: list) -> list:
-        """??????? ????, ???????? ?????? ????????????? ???????????? ? ??????????? TTL."""
+        """Создать узлы, сохраняя каждое промежуточное оборудование и недостающие TTL."""
         scene = self.view.network_scene
         chain: list = []
         for index, hop in enumerate(route):
@@ -1595,13 +1595,13 @@ class TopologyMapDialog(QDialog):
                 name, icon_key, _, _ = self._device_presentation(hop_ip, node_type)
                 label = hop_ip
             else:
-                node_type, name, icon_key = "unknown", "??? ??????", "topo_unknown"
-                label = f"??? {node_id.rsplit(':', 1)[-1]}"
+                node_type, name, icon_key = "unknown", "Без ответа", "topo_unknown"
+                label = f"Хоп {node_id.rsplit(':', 1)[-1]}"
             node = scene.nodes.get(node_id)
             if node is None:
                 scene.add_node(node_id, name, label, node_type, (index * 220, 0), icon_key=icon_key)
             elif node_type == "router" and node.node_type not in ("router", "local"):
-                # ??????? ???????????? ????; ???????????? ? ??????? ?????????? ????????.
+                # Сохранить существующий узел; перекрашивать в роутер допустимо только для транзита.
                 node.node_type = "router"
                 node.refresh_theme()
             if hop_ip:

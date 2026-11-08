@@ -5256,7 +5256,7 @@ class MainWindow(QWidget):
 
     def on_worker_progress(self, worker_id: str, progress: Any) -> None:
         """Вызывается при обновлении прогресса worker"""
-        # Прогресс обрабатывается чере�� сигналы напрямую для обратной совместимости
+        # Прогресс обрабатывается через сигналы напрямую для обратной совместимости
         pass
 
     def on_worker_finished(self, worker_id: str, result: Any) -> None:
