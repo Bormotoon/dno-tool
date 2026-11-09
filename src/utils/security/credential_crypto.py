@@ -6,7 +6,9 @@ from ctypes import wintypes
 import hashlib
 import os
 from pathlib import Path
+import stat
 import sys
+import tempfile
 import threading
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -84,33 +86,54 @@ def _load_or_create_master_key() -> bytes:
             return _cached_master_key
 
         path = _key_file_path()
-        if path.is_file():
+        try:
+            flags = os.O_RDONLY
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            fd = os.open(path, flags)
+        except FileNotFoundError:
+            fd = None
+
+        if fd is not None:
             try:
-                raw = base64.b64decode(path.read_bytes().strip(), validate=True)
+                file_stat = os.fstat(fd)
+                if not stat.S_ISREG(file_stat.st_mode):
+                    raise ValueError("Файл мастер-ключа не является обычным файлом")
+                if sys.platform != "win32" and (
+                    file_stat.st_uid != os.getuid() or file_stat.st_mode & 0o077
+                ):
+                    raise PermissionError("Небезопасный владелец или права файла мастер-ключа")
+                with os.fdopen(fd, "rb") as key_file:
+                    fd = -1
+                    raw = base64.b64decode(key_file.read().strip(), validate=True)
                 if sys.platform == "win32":
                     key = _dpapi_unprotect(raw)
                 else:
                     key = raw
-                if len(key) == _KEY_LEN:
-                    _cached_master_key = key
-                    return key
-            except Exception as exc:  # noqa: BLE001
-                logger.error(f"Не удалось прочитать локальный мастер-ключ ({exc}), создаётся новый")
+                if len(key) != _KEY_LEN:
+                    raise ValueError("Некорректная длина файла мастер-ключа")
+                _cached_master_key = key
+                return key
+            finally:
+                if fd >= 0:
+                    os.close(fd)
 
         key = os.urandom(_KEY_LEN)
         stored = _dpapi_protect(key) if sys.platform == "win32" else key
         encoded = base64.b64encode(stored)
 
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = path.with_suffix(".tmp")
-        fd = os.open(str(tmp_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+        tmp_path = Path(tmp_name)
         try:
-            os.write(fd, encoded)
-            os.fsync(fd)
-            ensure_file_user_owned(fd)
+            with os.fdopen(fd, "wb") as key_file:
+                key_file.write(encoded)
+                key_file.flush()
+                os.fsync(key_file.fileno())
+                ensure_file_user_owned(key_file.fileno())
+            os.replace(str(tmp_path), str(path))
         finally:
-            os.close(fd)
-        os.replace(str(tmp_path), str(path))
+            tmp_path.unlink(missing_ok=True)
 
         _cached_master_key = key
         return key
@@ -140,6 +163,8 @@ def _decrypt_legacy_v1(ciphertext_b64: str, *, strict: bool = False) -> str:
 def decrypt_password(ciphertext_b64: str, *, strict: bool = False) -> str:
     """Расшифровать пароль (поддерживает новый формат v2 AES-GCM и старый v1 AES-CBC)."""
     if not ciphertext_b64:
+        if strict:
+            raise ValueError("Не удалось расшифровать сохранённый секрет")
         return ""
     try:
         if ciphertext_b64.startswith(_V2_PREFIX):
