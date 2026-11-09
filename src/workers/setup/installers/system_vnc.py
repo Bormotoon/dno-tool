@@ -28,6 +28,13 @@ _ERROR_LINE = re.compile(
 )
 
 
+def short_evr(evr: str) -> str:
+    """VERSION-RELEASE для людей: без даты и коммита в RELEASE (0.0.6-10)."""
+    version, _, release = evr.partition("-")
+    build = release.split(".", 1)[0]
+    return f"{version}-{build}" if build else version
+
+
 @dataclass(frozen=True)
 class BundledRpm:
     """RPM в составе программы (``assets/remote``)."""
@@ -36,6 +43,11 @@ class BundledRpm:
     sha256: str
     # VERSION-RELEASE из пакета: совпадает с установленным — ставить не нужно.
     evr: str
+
+    @property
+    def version(self) -> str:
+        """Версия пакета для журнала и окна мастера (0.0.6-10)."""
+        return short_evr(self.evr)
 
     def load(self) -> bytes:
         """Прочитать пакет и сверить контрольную сумму."""
@@ -71,6 +83,12 @@ class SystemVncBackend(VncOperations):
     # Журнал сервера помимо journalctl (x11vnc пишет в свой файл).
     LOG_FILE: Optional[str] = None
     FAILURE_HINT = ""
+
+    @property
+    def label(self) -> str:
+        """Имя сервера для журнала мастера; у пакета из программы — с версией."""
+        bundled = self.PACKAGE.bundled
+        return f"{self.TITLE} {bundled.version}" if bundled is not None else self.TITLE
 
     @property
     def unit(self) -> str:
@@ -119,7 +137,7 @@ class SystemVncBackend(VncOperations):
             return False
 
         self.context.log(
-            device.host, svc, f"Начало установки общего экрана ({self.TITLE})"
+            device.host, svc, f"Начало установки общего экрана ({self.label})"
         )
         if self.PASSWORD_REQUIRED and not password:
             fail(f"Для {self.TITLE} нужен пароль VNC", "не задан пароль")
@@ -135,7 +153,10 @@ class SystemVncBackend(VncOperations):
         # 1. Пакет.
         if aborted():
             return
-        if not self._ensure_package(run_cmd, write_file, log):
+        def notice(message: str) -> None:
+            self.context.log(device.host, svc, message)
+
+        if not self._ensure_package(run_cmd, write_file, log, notice):
             reason = output_lines[-1] if output_lines else ""
             fail(
                 f"Пакет {self.PACKAGE.name} не установлен",
@@ -246,7 +267,8 @@ class SystemVncBackend(VncOperations):
 
     # --- Пакет -------------------------------------------------------------
 
-    def _ensure_package(self, run_cmd, write_file, log) -> bool:
+    def _ensure_package(self, run_cmd, write_file, log, notice=None) -> bool:
+        """Поставить пакет; ``notice`` получает строку для общего журнала мастера."""
         package = self.PACKAGE
         if package.bundled is None:
             code, out, _ = run_cmd(f"command -v {shlex.quote(package.binary)}", timeout=15)
@@ -264,10 +286,16 @@ class SystemVncBackend(VncOperations):
                 return False
             return True
 
-        evr = package.bundled.evr
-        if self._installed_evr(run_cmd, package.name) == evr:
-            log(f"{package.name} уже установлен ({evr})")
+        bundled = package.bundled
+        installed = self._installed_evr(run_cmd, package.name)
+        if installed == bundled.evr:
+            log(f"{package.name} уже установлен ({bundled.version})")
             return True
+        if installed:
+            message = f"{package.name}: обновление {short_evr(installed)} → {bundled.version}"
+            log(message)
+            if notice is not None:
+                notice(message)
         return self._install_bundled(run_cmd, write_file, package, log)
 
     @staticmethod
@@ -302,7 +330,7 @@ class SystemVncBackend(VncOperations):
             if code != 0 or not (out or "").startswith(rpm.sha256):
                 log(f"Пакет {package.name} повреждён при передаче")
                 return False
-            log(f"Устанавливаю {package.name} ({rpm.evr})...")
+            log(f"Устанавливаю {package.name} {rpm.version} ({rpm.evr})...")
             # dnf подтягивает недостающие библиотеки из репозитория. Без
             # доступа к репозиторию dnf отказывает даже при всех
             # зависимостях на месте, тогда ставит rpm.
@@ -317,7 +345,7 @@ class SystemVncBackend(VncOperations):
         if self._installed_evr(run_cmd, package.name) != rpm.evr:
             log(f"После установки пакет {package.name} не найден")
             return False
-        log(f"Пакет {package.name} установлен ({rpm.evr})")
+        log(f"Пакет {package.name} {rpm.version} установлен ({rpm.evr})")
         return True
 
     # --- Проверка ----------------------------------------------------------
@@ -342,7 +370,7 @@ class SystemVncBackend(VncOperations):
             if code == 0 and (out or "").strip():
                 log(f"Порт {port} слушается - общий экран {self.TITLE} готов")
                 self.context.log(
-                    device.host, svc, f"{self.TITLE} установлен и готов к работе"
+                    device.host, svc, f"{self.label} установлен и готов к работе"
                 )
                 self._report(device, svc, RESULT_SUCCESS, "\n".join(output_lines))
                 return

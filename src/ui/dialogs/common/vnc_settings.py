@@ -82,6 +82,16 @@ SERVER_GUIDE = {
 PASSWORD_REQUIRED = ("kmsvnc", "krfb")
 
 
+def server_choice_labels() -> dict[str, str]:
+    """Подписи для списков выбора: у kmsvnc — версия пакета, который поставит мастер."""
+    # Импорт здесь: пакет src.workers тяжёлый, модуль окна не должен тянуть его при загрузке.
+    from src.workers.setup.installers.kmsvnc import RPM
+
+    labels = dict(SERVER_LABELS)
+    labels["kmsvnc"] = f"kmsvnc {RPM.version} — основной вариант"
+    return labels
+
+
 def server_label(server: str) -> str:
     """Короткое имя сервера для журналов, меню и сводки мастера."""
     return server if server in SERVER_LABELS else DEFAULT_VNC_SERVER
@@ -117,7 +127,7 @@ class VncConfigWidget(QWidget):
         self._server_title = QLabel("Сервер:")
         server_row.addWidget(self._server_title)
         self._server_combo = QComboBox()
-        for sid, label in SERVER_LABELS.items():
+        for sid, label in server_choice_labels().items():
             self._server_combo.addItem(label, sid)
         self._server_combo.setToolTip(
             "VNC-сервер на хостах. Устанавливает его Мастер настройки; "

@@ -389,10 +389,10 @@ class SetupWizardDialog(QDialog):
         server_row.setContentsMargins(20, 0, 0, 0)
         server_label = QLabel("VNC-сервер:")
         server_row.addWidget(server_label)
-        from src.ui.dialogs.common.vnc_settings import SERVER_GUIDE, SERVER_LABELS
+        from src.ui.dialogs.common.vnc_settings import SERVER_GUIDE, server_choice_labels
 
         self._vnc_server_combo = QComboBox()
-        for server, label in SERVER_LABELS.items():
+        for server, label in server_choice_labels().items():
             self._vnc_server_combo.addItem(label, server)
         saved = getattr(config.app.veyon, "vnc_server", DEFAULT_VNC_SERVER) or DEFAULT_VNC_SERVER
         idx = self._vnc_server_combo.findData(saved)

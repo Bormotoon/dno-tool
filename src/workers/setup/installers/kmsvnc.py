@@ -18,14 +18,15 @@ from src.workers.setup.installers.system_vnc import (
 from src.workers.setup.templates import _KMSVNC_SERVICE_TEMPLATE
 
 RPM = BundledRpm(
-    file_name="kmsvnc-0.0.6-9.20240625git190db24.dno-rosa2021.1.x86_64.rpm",
-    sha256="c39e03a6adb7615b27d30f3089c89f090d7681252dabea11885c0f8085486806",
-    evr="0.0.6-9.20240625git190db24.dno",
+    file_name="kmsvnc-0.0.6-10.20240625git190db24.dno-rosa2021.1.x86_64.rpm",
+    sha256="bf424dd521a6a8a61618754f6f252cd907a455c503d912f03e3b4198d26da2f4",
+    evr="0.0.6-10.20240625git190db24.dno",
 )
 RPM_ARCH = "x86_64"
 # Старшая версия символов glibc в программе (objdump -T): пакет собран
-# в окружении МОС 12 и ставится на МОС 12 и новее.
-MIN_GLIBC = (2, 17)
+# в окружении МОС 12 и ставится на МОС 12 и новее. С 0.0.6-9 встроенная
+# libvncserver берёт stat/fstat из GLIBC_2.33.
+MIN_GLIBC = (2, 33)
 
 PASSWORD_FILE = "/etc/kmsvnc/passwd"
 

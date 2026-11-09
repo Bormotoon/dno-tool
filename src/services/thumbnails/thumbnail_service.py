@@ -29,6 +29,19 @@ from src.services.thumbnails.types import (
     ThumbnailStatus,
 )
 
+# Аренда сеанса для запросов без подписки (веб-интерфейс). Веб начинает
+# следующий цикл через интервал после окончания зонда всех хостов, поэтому
+# период запросов к одному хосту — интервал плюс длительность зонда. Короткая
+# аренда закрывала соединение VNC между циклами, и каждая миниатюра открывала
+# его заново с полной пересылкой кадра.
+HTTP_LEASE_MIN_SEC = 30.0
+HTTP_LEASE_INTERVALS = 3
+
+
+def http_lease_seconds(interval_sec: float) -> float:
+    """Сколько держать сеанс после запроса без подписки."""
+    return max(HTTP_LEASE_MIN_SEC, HTTP_LEASE_INTERVALS * interval_sec)
+
 
 class _Configuration(Protocol):
     app: AppConfig
@@ -321,7 +334,7 @@ class ThumbnailService:
             usage.last_request = now
             usage.devices.add(iid)
             if consumer is None:
-                usage.http_until = now + max(5, 2 * settings.interval_sec)
+                usage.http_until = now + http_lease_seconds(settings.interval_sec)
             else:
                 self.subscribe(device, consumer)
             consumer_key = (iid, consumer) if consumer is not None else None

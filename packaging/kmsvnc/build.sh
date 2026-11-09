@@ -17,8 +17,8 @@ IMAGE=docker.io/rosalab/rosa2021.1@sha256:2be149fd2f4e00bb4da5c3ea7ce600bc29e47d
 MIRROR=${KMSVNC_MIRROR:-http://os.mos.ru/repo/r/rosa2021.1/base/release/repository/x86_64}
 COMMIT=$(sed -n 's/^%global commit[[:space:]]*//p' "$HERE/kmsvnc.spec")
 TARBALL="kmsvnc-$COMMIT.tar.gz"
-SOURCE_COMMIT=a480cd72d364c83ace42be0eb1bf2dc22ac8f24d
-SOURCE_SHA256=be1b302bee7426e0fc777d849b6f15142e7711deb4a66512711ce5788e33a9a1
+SOURCE_COMMIT=d766c49283759b4060303f80bbddf49afacbebc8
+SOURCE_SHA256=0e209cd62422a3ffe9650aa107803a7909bda326b7b5d852716fd3604641d771
 SOURCE_URL="https://codeload.github.com/xp9k/kmsvnc/tar.gz/$SOURCE_COMMIT"
 # libvncserver встраивается в kmsvnc статически (см. kmsvnc.spec).
 LVS_VERSION=$(sed -n 's/^%global lvs_version[[:space:]]*//p' "$HERE/kmsvnc.spec")
