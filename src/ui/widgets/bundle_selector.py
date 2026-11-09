@@ -37,20 +37,25 @@ class BundleSelector(QWidget):
 
     # Срабатывает при изменении выбора (iid). None = «(наследовать)» / «(нет)».
     changed = Signal(object)
+    # Выбор пользователя в списке (не программная смена и не обновление списка).
+    picked = Signal(object)
 
     def __init__(
         self,
         parent=None,
         allow_none: bool = True,
         none_label: str = "(наследовать)",
+        service=None,
     ) -> None:
         """
         Args:
             parent: Родительский виджет.
             allow_none: Разрешить выбор «нет связки» (первая запись).
             none_label: Текст записи «нет связки» (например «(наследовать)»).
+            service: Хранилище связок; None — SSH-связки (CredentialService).
         """
         super().__init__(parent)
+        self._service = service
         self._allow_none = allow_none
         self._none_label = none_label
         self._none_iid = None  # iid для записи «нет связки»
@@ -63,6 +68,7 @@ class BundleSelector(QWidget):
         self._combo = QComboBox(self)
         self._combo.setMinimumWidth(140)
         self._combo.currentIndexChanged.connect(self._on_combo_changed)
+        self._combo.activated.connect(lambda _index: self.picked.emit(self.current_iid()))
         layout.addWidget(self._combo, 1)
 
         self._manage_btn = QToolButton(self)
@@ -86,6 +92,8 @@ class BundleSelector(QWidget):
         return iid
 
     def _get_service(self):
+        if self._service is not None:
+            return self._service
         return credential_service_for(self)
 
     def showEvent(self, event):
@@ -154,7 +162,7 @@ class BundleSelector(QWidget):
         try:
             from src.ui.dialogs.tools.credentials import CredentialsDialog
 
-            dlg = CredentialsDialog(self)
+            dlg = CredentialsDialog(self, service=self._service)
             dlg.exec()
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox

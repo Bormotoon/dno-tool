@@ -31,20 +31,21 @@ from src.services.configuration.credential_service import CredentialService, PAS
 class CredentialsDialog(QDialog):
     """Диалог управления связками учётных данных."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, service=None):
+        """``service`` — другое хранилище связок (например, связки камер)."""
         super().__init__(parent)
         self.setSizeGripEnabled(True)
-        self.setWindowTitle("Связки учётных данных")
+        self.setWindowTitle(getattr(service, "title", "Связки учётных данных"))
         self.setMinimumWidth(560)
         self.setMinimumHeight(320)
-        self._svc = None
-        widget = parent
+        self._svc = service
+        widget = parent if service is None else None
         while widget is not None:
             self._svc = getattr(widget, "wizard_credential_service", None)
             if self._svc is not None:
                 break
             widget = widget.parentWidget()
-        if self._svc is None and parent is not None and hasattr(parent, "_get_service"):
+        if self._svc is None and service is None and parent is not None and hasattr(parent, "_get_service"):
             self._svc = parent._get_service()
         if self._svc is None:
             self._svc = self._get_service()
@@ -57,9 +58,13 @@ class CredentialsDialog(QDialog):
         layout = QVBoxLayout(self)
 
         hint = QLabel(
-            "Связки учётных данных (логин/пароль) для SSH-подключений.\n"
-            "Дважды кликните по ячейке для редактирования. Пароль хранится "
-
+            getattr(
+                self._svc,
+                "hint",
+                "Связки учётных данных (логин/пароль) для SSH-подключений.\n"
+                "Дважды кликните по ячейке для редактирования. Пароль хранится "
+                "в settings.json в зашифрованном виде.",
+            )
         )
         hint.setWordWrap(True)
         hint.setStyleSheet("color: gray;")
@@ -205,6 +210,9 @@ class CredentialsDialog(QDialog):
         if not ok:
             QMessageBox.critical(self, "Ошибка", "Не удалось сохранить конфигурацию.")
             return False
-        message = "Связки добавлены в черновик мастера. Они запишутся после «Готово»." if getattr(self._svc._config, "wizard_draft", False) else "Связки учётных данных сохранены."
+        if getattr(getattr(self._svc, "_config", None), "wizard_draft", False):
+            message = "Связки добавлены в черновик мастера. Они запишутся после «Готово»."
+        else:
+            message = getattr(self._svc, "saved_message", "Связки учётных данных сохранены.")
         QMessageBox.information(self, "Сохранение", message)
         return True

@@ -231,10 +231,18 @@ def install_camera_routes(
         models = {item.iid: item for item in service().load_cameras()}
         if set(iids) - models.keys():
             raise HTTPException(404, "Камера не найдена")
+        # Камера без найденной связки получает сообщение в своей ячейке,
+        # остальные камеры доски открываются как обычно.
+        denied = {
+            iid: models[iid].credential_error
+            for iid in dict.fromkeys(iids)
+            if models[iid].credential_error
+        }
         entries = []
         try:
             for iid in dict.fromkeys(iids):
-                entries.append(streams.acquire(models[iid]))
+                if iid not in denied:
+                    entries.append(streams.acquire(models[iid]))
         except HTTPException:
             for entry in entries:
                 streams.release(entry)
@@ -244,6 +252,8 @@ def install_camera_routes(
             sequences: dict[str, int] = {}
             states: dict[str, str] = {}
             heartbeat = time.monotonic()
+            for iid, message in denied.items():
+                yield f'event: state\ndata: {json.dumps({"iid": iid, "message": message}, ensure_ascii=False)}\n\n'
             try:
                 while not await request.is_disconnected() and not any(
                     entry.cancel.is_set() for entry in entries

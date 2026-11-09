@@ -79,7 +79,10 @@ class CameraPreviewController(QObject):
                 _ = camera.rtsp_url
             except ValueError:
                 self.updated.emit(
-                    camera.identifier, None, 0.0, "Некорректный адрес RTSP"
+                    camera.identifier,
+                    None,
+                    0.0,
+                    camera.credential_error or "Некорректный адрес RTSP",
                 )
             else:
                 self._wanted[camera.identifier] = (

@@ -117,6 +117,7 @@ class CameraRecordingManager(QObject):
                         "ip_address",
                         "login",
                         "password",
+                        "credential_error",
                         "output_path",
                         "path_mask",
                         "file_mask",
@@ -200,6 +201,8 @@ class CameraRecordingManager(QObject):
         active = sum(bool(r.worker or r.intent) for r in self.records.values())
         if active >= self.policy.max_simultaneous:
             raise ValueError("Достигнут лимит одновременных записей")
+        if record.camera.credential_error:
+            raise ValueError(record.camera.credential_error)
         if not record.online:
             raise ValueError("Камера недоступна")
         record.intent = True
@@ -221,6 +224,11 @@ class CameraRecordingManager(QObject):
             or record.worker
             or record.removed
         ):
+            return
+        if record.camera.credential_error:
+            record.intent = False
+            record.status, record.error = "error", record.camera.credential_error
+            self.changed.emit()
             return
         try:
             output = record.camera.record_file()

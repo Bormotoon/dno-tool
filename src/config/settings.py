@@ -1080,10 +1080,14 @@ class CameraConfig:
     Структура ``cameras`` — иерархия ``{address: {cabinet: {camera_name: ip}}}``
     (как в config.json echd_qt6). Адрес — IP/имя с необязательными портом
     и путём, например ``10.161.27.201:554/onvif1``.
+
+    Учётные данные RTSP — связки ``bundles`` (как у SSH): связка камеры
+    ``camera_bundles[iid камеры]`` → связка по умолчанию → без авторизации.
     """
 
-    login: str = ""
-    password: str = field(default="", repr=False)
+    bundles: list = field(default_factory=list)  # list[CredentialBundle]
+    default_bundle_iid: str = ""  # Связка по умолчанию для всех камер
+    camera_bundles: dict = field(default_factory=dict)  # {iid камеры: iid связки}
     player: str = "vlc"  # vlc / mpv / ffplay / системный
     preview_backend: str = "ffmpeg"  # ffmpeg / qt — встроенный просмотр
     preview_transport: str = "tcp"  # Транспорт RTSP встроенного Qt-просмотра
@@ -1126,7 +1130,42 @@ class CameraConfig:
 
 
 # Настройки прежних версий: в старых settings.json они остаются и не считаются ошибкой.
-_REMOVED_CAMERA_SETTINGS = frozenset({"retention_days"})
+# Общие login/password заменены связками без переноса значений.
+_REMOVED_CAMERA_SETTINGS = frozenset({"retention_days", "login", "password"})
+_CAMERA_BUNDLE_KEYS = frozenset({"iid", "description", "login", "password"})
+
+
+def _normalize_camera_bundles(source, invalid) -> list:
+    """Проверить связки учётных данных камер; повтор iid — ошибка."""
+    if not isinstance(source, list):
+        invalid("Связки камер должны быть списком")
+        return []
+    result = []
+    used = set()
+    for entry in source:
+        if isinstance(entry, CredentialBundle):
+            entry = asdict(entry)
+        if not isinstance(entry, dict) or set(entry) - _CAMERA_BUNDLE_KEYS:
+            invalid("Некорректная связка учётных данных камер")
+            continue
+        values = {key: entry.get(key, "") for key in _CAMERA_BUNDLE_KEYS}
+        if not all(isinstance(value, str) for value in values.values()):
+            invalid("Поля связки учётных данных камер должны быть строками")
+            continue
+        iid = values["iid"].strip() or uuid4().hex
+        if iid in used:
+            invalid("Идентификатор связки камер повторяется")
+            continue
+        used.add(iid)
+        result.append(
+            CredentialBundle(
+                iid=iid,
+                description=values["description"].strip(),
+                login=values["login"].strip(),
+                password=values["password"],
+            )
+        )
+    return result
 
 
 def normalize_camera_config(data: dict, *, strict: bool = True) -> CameraConfig:
@@ -1146,7 +1185,7 @@ def normalize_camera_config(data: dict, *, strict: bool = True) -> CameraConfig:
     unknown = set(data) - set(defaults.__dataclass_fields__) - _REMOVED_CAMERA_SETTINGS
     if unknown:
         invalid("Неизвестные поля настроек камер")
-    for key in ("login", "password", "player", "output", "path_mask", "file_mask"):
+    for key in ("player", "output", "path_mask", "file_mask", "default_bundle_iid"):
         value = data.get(key, getattr(defaults, key))
         if not isinstance(value, str):
             invalid(f"Поле {key} должно быть строкой")
@@ -1283,6 +1322,21 @@ def normalize_camera_config(data: dict, *, strict: bool = True) -> CameraConfig:
                         iid=iid,
                     )
                     model.record_file()
+    result.bundles = _normalize_camera_bundles(
+        data.get("bundles", []), invalid
+    )
+    # Ссылки на удалённую связку сохраняются: при подключении камера
+    # сообщит о необходимости заполнить данные для входа.
+    links = data.get("camera_bundles", {})
+    if not isinstance(links, dict):
+        invalid("Связки камер по идентификаторам должны быть объектом")
+        links = {}
+    known = set(result.camera_ids.values())
+    for camera_iid, bundle_iid in links.items():
+        if not isinstance(camera_iid, str) or not isinstance(bundle_iid, str):
+            invalid("Некорректная ссылка камеры на связку")
+        elif camera_iid in known and bundle_iid:
+            result.camera_bundles[camera_iid] = bundle_iid
     if strict:
         from src.domain.models.camera import CameraModel
 
@@ -1689,13 +1743,16 @@ class Config:
                                 raise ValueError("Настройки камер должны быть объектом")
                             camera_data = deepcopy(data["camera"])
                             from src.utils.security.credential_crypto import decrypt_password
-                            secret = camera_data.get("password", "")
-                            if isinstance(secret, str) and secret.startswith("enc:v1:"):
-                                camera_data["password"] = decrypt_password(secret[7:], strict=True)
+                            plaintext = False
+                            bundles_data = camera_data.get("bundles", [])
+                            for bundle in bundles_data if isinstance(bundles_data, list) else ():
+                                secret = bundle.get("password", "") if isinstance(bundle, dict) else ""
+                                if isinstance(secret, str) and secret.startswith("enc:v1:"):
+                                    bundle["password"] = decrypt_password(secret[7:], strict=True)
+                                elif secret:
+                                    plaintext = True
                             loaded_camera = normalize_camera_config(camera_data, strict=False)
-                            if asdict(loaded_camera) != camera_data or (
-                                secret and not secret.startswith("enc:v1:")
-                            ):
+                            if asdict(loaded_camera) != camera_data or plaintext:
                                 self._camera_backup_source = original_bytes
                             self.app.camera = loaded_camera
                         except Exception as e:
@@ -1871,11 +1928,14 @@ class Config:
             }
             data["web"].pop("thread_count", None)
             from src.utils.security.credential_crypto import encrypt_password
-            camera_secret = self.app.camera.password
-            encrypted_camera_secret = encrypt_password(camera_secret)
-            if camera_secret and not encrypted_camera_secret:
-                raise ValueError("Не удалось зашифровать пароль камер")
-            data["camera"]["password"] = "enc:v1:" + encrypted_camera_secret if camera_secret else ""
+            for bundle in data["camera"]["bundles"]:
+                camera_secret = bundle.get("password", "")
+                encrypted_camera_secret = encrypt_password(camera_secret)
+                if camera_secret and not encrypted_camera_secret:
+                    raise ValueError("Не удалось зашифровать пароль связки камер")
+                bundle["password"] = (
+                    "enc:v1:" + encrypted_camera_secret if camera_secret else ""
+                )
             data["web"].pop("command_thread_count", None)
             ldap_secret = self.app.web.ldap.bind_password
             encrypted_ldap_secret = encrypt_password(ldap_secret)

@@ -1,7 +1,7 @@
 """Диалог настроек камер видеонаблюдения ЕЦХД.
 
 Три вкладки:
-- «Подключение»: логин/пароль/таймаут пинга.
+- «Подключение»: связка учётных данных по умолчанию, таймауты.
 - «Запись»: каталог вывода, плеер, шаблон пути/имени файла, превью.
 - «Камеры»: иерархия Адрес → Кабинет → Камера (адрес RTSP) с правкой узлов.
 """
@@ -16,6 +16,7 @@ from uuid import uuid4
 from typing import Optional
 
 from PySide6.QtCore import Qt, Slot
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -33,6 +34,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QSlider,
+    QStyledItemDelegate,
     QTabWidget,
     QTreeWidget,
     QTreeWidgetItem,
@@ -42,9 +44,15 @@ from PySide6.QtWidgets import (
 
 from src.ui.icons import _icon_from_key
 from src.config.settings import CameraConfig, normalize_camera_config
-from src.domain.models.camera import CameraModel
+from src.domain.models.camera import (
+    CAMERA_CREDENTIALS_REQUIRED,
+    CameraModel,
+    camera_credentials_notice,
+)
 from src.logger import logger
 from src.services import CameraService
+from src.services.remote.camera_service import resolve_camera_credentials
+from src.ui.widgets.bundle_selector import BundleSelector
 from src.workers.camera_workers import DEFAULT_PING_INTERVAL, CameraHardwareInfoWorker
 
 PLAYER_OPTIONS = ["vlc", "mpv", "ffplay", "системный"]
@@ -99,9 +107,55 @@ class _LabeledSlider(QWidget):
         self._slider.setToolTip(text)
         self._label.setToolTip(text)
 
-# Колонки дерева камер: Адрес | Камера | Адрес RTSP.
+# Колонки дерева камер: Адрес | Камера | Адрес RTSP | Авторизация.
 # Адрес и кабинет оба пишут в колонку ADDR (различаются вложенностью).
-COL_ADDR, COL_CAM, COL_IP = range(3)
+COL_ADDR, COL_CAM, COL_IP, COL_BUNDLE = range(4)
+# iid связки камеры в колонке COL_BUNDLE; пусто — связка по умолчанию.
+BUNDLE_ROLE = Qt.ItemDataRole.UserRole + 2
+BUNDLE_DEFAULT_LABEL = "(по умолчанию)"
+BUNDLE_NONE_LABEL = "(без авторизации)"
+
+
+def _bundle_label(bundle: dict) -> str:
+    return bundle.get("description") or bundle.get("login") or "(без описания)"
+
+
+class _CameraBundleDelegate(QStyledItemDelegate):
+    """Выбор связки камеры в колонке «Авторизация» (iid хранится в BUNDLE_ROLE)."""
+
+    def __init__(self, dialog: "CameraSettingsDialog") -> None:
+        super().__init__(dialog)
+        self._dialog = dialog
+
+    def createEditor(self, parent, option, index):
+        kind = index.sibling(index.row(), 0).data(Qt.ItemDataRole.UserRole)
+        if not isinstance(kind, tuple) or not kind or kind[0] != "cam":
+            return None
+        combo = QComboBox(parent)
+        combo.addItem(BUNDLE_DEFAULT_LABEL, "")
+        for bundle in self._dialog._bundle_store.get_bundles():
+            combo.addItem(_bundle_label(bundle), bundle.get("iid", ""))
+        current = index.data(BUNDLE_ROLE) or ""
+        if current and combo.findData(current) < 0:
+            combo.addItem("Связка не найдена", current)
+        # Выбор сразу записывается в модель, без отдельного подтверждения.
+        combo.activated.connect(
+            lambda _index, editor=combo: (
+                self.commitData.emit(editor),
+                self.closeEditor.emit(editor),
+            )
+        )
+        return combo
+
+    def setEditorData(self, editor, index):
+        editor.setCurrentIndex(max(0, editor.findData(index.data(BUNDLE_ROLE) or "")))
+
+    def setModelData(self, editor, model, index):
+        model.setData(index, editor.currentData() or "", BUNDLE_ROLE)
+        self._dialog._refresh_bundle_labels()
+
+    def updateEditorGeometry(self, editor, option, index):
+        editor.setGeometry(option.rect)
 
 OUTPUT_HINT = (
     "Каталог записи. Пусто = домашняя папка. "
@@ -200,17 +254,22 @@ class CameraSettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Настройки камер ЕЦХД")
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
-        self.resize(560, 420)
-        self.setMinimumSize(520, 360)
+        self.resize(780, 480)
+        self.setMinimumSize(640, 360)
         self.setSizeGripEnabled(True)
 
         self._svc = camera_service
         self._cfg = deepcopy(camera_service.get_settings())
+        self._bundle_store = camera_service.bundle_store()
         self._probe = None
         self._hardware_info: CameraHardwareInfoWorker | None = None
         self._pending_result = None
         self._extra_fields = {}
         self._collected_ids = {}
+        self._collected_bundles = {}
+        # Сохранённая связка по умолчанию, которой нет среди связок: остаётся
+        # (и считается непрошедшей проверку), пока пользователь не выберет другую.
+        self._missing_default = ""
 
         self._suppress_item_changed = False
         self._setup_ui()
@@ -254,6 +313,11 @@ class CameraSettingsDialog(QDialog):
             error_label = QLabel(self._svc.load_error)
             error_label.setWordWrap(True)
             layout.addWidget(error_label)
+        self._notice_label = QLabel()
+        self._notice_label.setWordWrap(True)
+        self._notice_label.setStyleSheet("color: #dc3545;")
+        self._notice_label.hide()
+        layout.addWidget(self._notice_label)
 
         self._tabs = QTabWidget()
         layout.addWidget(self._tabs, 1)
@@ -282,20 +346,17 @@ class CameraSettingsDialog(QDialog):
         form.setContentsMargins(12, 12, 12, 12)
         form.setSpacing(8)
 
-        self._login_edit = QLineEdit()
-        self._login_edit.setPlaceholderText("Логин RTSP (например: subaccount)")
-        self._login_edit.setToolTip(
-            "Имя пользователя для доступа к RTSP-потокам. Применяется ко всем камерам."
+        self._bundle_selector = BundleSelector(
+            self, none_label=BUNDLE_NONE_LABEL, service=self._bundle_store
         )
-        form.addRow("Логин:", self._login_edit)
-
-        self._password_edit = QLineEdit()
-        self._password_edit.setPlaceholderText("Пароль RTSP")
-        self._password_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self._password_edit.setToolTip(
-            "Пароль доступа к RTSP-потокам всех камер. Используется для просмотра, записи и проверки подключения."
+        self._bundle_selector.setToolTip(
+            "Связка учётных данных (логин/пароль RTSP) для камер, у которых в колонке "
+            "«Авторизация» выбрано «(по умолчанию)». Кнопка справа открывает список связок камер; "
+            "изменения связок сохраняются сразу."
         )
-        form.addRow("Пароль:", self._password_edit)
+        self._bundle_selector.changed.connect(self._on_bundles_changed)
+        self._bundle_selector.picked.connect(self._on_default_picked)
+        form.addRow("Связка по умолчанию:", self._bundle_selector)
 
         self._timeout_spin = QSpinBox()
         self._timeout_spin.setRange(1, 10)
@@ -323,7 +384,7 @@ class CameraSettingsDialog(QDialog):
             self._add_integer_field(form, key, label, low, high, suffix)
         self._test_button = QPushButton("Проверить выбранную камеру")
         self._test_button.setToolTip(
-            "Сначала выберите камеру на вкладке «Камеры». Проверка использует текущие логин, пароль и таймаут RTSP без сохранения настроек. Поток открывается встроенными медиабиблиотеками."
+            "Сначала выберите камеру на вкладке «Камеры». Проверка использует выбранную связку и таймаут RTSP без сохранения настроек. Поток открывается встроенными медиабиблиотеками."
         )
         self._test_button.clicked.connect(self._test_connection)
         form.addRow(self._test_button)
@@ -332,8 +393,8 @@ class CameraSettingsDialog(QDialog):
         form.addRow(self._test_result)
 
         hint = QLabel(
-            "Учётные данные применяются ко всем камерам. "
-            "Каждая камера идентифицируется как «Адрес::Кабинет::Камера»."
+            "Связка по умолчанию применяется ко всем камерам; отдельной камере "
+            "связку можно выбрать в колонке «Авторизация» на вкладке «Камеры»."
         )
         hint.setWordWrap(True)
         form.addRow(hint)
@@ -730,8 +791,11 @@ class CameraSettingsDialog(QDialog):
         layout.setSpacing(6)
 
         self._cam_tree = _CamerasTree()
-        self._cam_tree.setColumnCount(3)
-        self._cam_tree.setHeaderLabels(["Адрес", "Камера", "Адрес RTSP"])
+        self._cam_tree.setColumnCount(4)
+        self._cam_tree.setHeaderLabels(["Адрес", "Камера", "Адрес RTSP", "Авторизация"])
+        self._cam_tree.setItemDelegateForColumn(
+            COL_BUNDLE, _CameraBundleDelegate(self)
+        )
         self._cam_tree.headerItem().setToolTip(
             COL_ADDR,
             "Группировка камер: адрес объекта, внутри него — кабинет. Это названия для организации списка и подстановки в путь записи.",
@@ -745,7 +809,7 @@ class CameraSettingsDialog(QDialog):
             "IP или имя камеры, необязательные порт и путь. Например: "
             "192.0.2.1/onvif1 или camera.example:8554/onvif/profile1?channel=1. "
             "Можно указать rtsp:// или rtsps://. Без порта используется 554. "
-            "Логин и пароль задаются отдельно на вкладке «Подключение». "
+            "Логин и пароль задаются связкой в колонке «Авторизация». "
             "Путь /onvif зависит от модели камеры; автоматического поиска ONVIF нет.",
         )
         header = self._cam_tree.header()
@@ -753,10 +817,17 @@ class CameraSettingsDialog(QDialog):
         header.setSectionResizeMode(COL_ADDR, QHeaderView.ResizeMode.Interactive)
         header.setSectionResizeMode(COL_CAM, QHeaderView.ResizeMode.Interactive)
         header.setSectionResizeMode(COL_IP, QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(COL_BUNDLE, QHeaderView.ResizeMode.Interactive)
+        self._cam_tree.headerItem().setToolTip(
+            COL_BUNDLE,
+            "Связка учётных данных камеры. «(по умолчанию)» — связка, выбранная "
+            "на вкладке «Подключение».",
+        )
         header.setStretchLastSection(False)
         self._cam_tree.setColumnWidth(COL_ADDR, 260)
         self._cam_tree.setColumnWidth(COL_CAM, 140)
         self._cam_tree.setColumnWidth(COL_IP, 150)
+        self._cam_tree.setColumnWidth(COL_BUNDLE, 130)
         self._cam_tree.setSelectionMode(QTreeWidget.SelectionMode.SingleSelection)
         self._cam_tree.setEditTriggers(
             QTreeWidget.EditTrigger.DoubleClicked
@@ -797,8 +868,11 @@ class CameraSettingsDialog(QDialog):
     # ---------- Загрузка ----------
 
     def _load_data(self) -> None:
-        self._login_edit.setText(self._cfg.login or "")
-        self._password_edit.setText(self._cfg.password or "")
+        default = self._cfg.default_bundle_iid or ""
+        self._bundle_selector.set_current_iid(default or None)
+        self._missing_default = (
+            default if default and self._bundle_selector.current_iid() != default else ""
+        )
         self._timeout_spin.setValue(int(self._cfg.timeout or 2))
         self._ping_interval_spin.setValue(
             int(self._cfg.ping_interval or DEFAULT_PING_INTERVAL)
@@ -860,10 +934,12 @@ class CameraSettingsDialog(QDialog):
                     cam_item.setText(COL_CAM, camera_name)
                     cam_item.setText(COL_IP, ip)
                     key = f"{address}::{cabinet}::{camera_name}"
+                    camera_iid = self._cfg.camera_ids.get(key) or uuid4().hex
+                    cam_item.setData(0, Qt.ItemDataRole.UserRole + 1, camera_iid)
                     cam_item.setData(
-                        0,
-                        Qt.ItemDataRole.UserRole + 1,
-                        self._cfg.camera_ids.get(key) or uuid4().hex,
+                        COL_BUNDLE,
+                        BUNDLE_ROLE,
+                        self._cfg.camera_bundles.get(camera_iid, ""),
                     )
                     cam_item.setIcon(COL_CAM, _icon_from_key("camera"))
                     cam_item.setData(
@@ -874,6 +950,79 @@ class CameraSettingsDialog(QDialog):
                     cam_item.setFlags(cam_item.flags() | Qt.ItemFlag.ItemIsEditable)
         self._cam_tree.expandAll()
         self._suppress_item_changed = False
+        self._refresh_bundle_labels()
+
+    # ---------- Связки ----------
+
+    def _on_bundles_changed(self, _iid=None) -> None:
+        """Связки могли измениться в диалоге: обновить подписи и сообщение."""
+        self._refresh_bundle_labels()
+
+    def _on_default_picked(self, _iid=None) -> None:
+        """Явный выбор связки по умолчанию заменяет ненайденную."""
+        self._missing_default = ""
+        self._refresh_bundle_labels()
+
+    def _default_bundle_iid(self) -> str:
+        return self._bundle_selector.current_iid() or self._missing_default
+
+    def _camera_items(self):
+        root = self._cam_tree.invisibleRootItem()
+        for i in range(root.childCount()):
+            addr_item = root.child(i)
+            for j in range(addr_item.childCount()):
+                cab_item = addr_item.child(j)
+                for k in range(cab_item.childCount()):
+                    yield cab_item.child(k)
+
+    def _refresh_bundle_labels(self) -> None:
+        """Подписи колонки «Авторизация» и общее напоминание по текущему выбору."""
+        bundles = {b.get("iid", ""): b for b in self._bundle_store.get_bundles()}
+        default = self._default_bundle_iid()
+        default_failed = bool(default) and default not in bundles
+        failed = 0
+        suppress, self._suppress_item_changed = self._suppress_item_changed, True
+        try:
+            for item in self._camera_items():
+                iid = item.data(COL_BUNDLE, BUNDLE_ROLE) or ""
+                bundle = bundles.get(iid)
+                broken = (not iid and default_failed) or (bool(iid) and bundle is None)
+                if not iid:
+                    text = BUNDLE_DEFAULT_LABEL
+                    tip = (
+                        CAMERA_CREDENTIALS_REQUIRED
+                        if default_failed
+                        else "Используется связка по умолчанию (вкладка «Подключение»)"
+                    )
+                elif bundle is None:
+                    text, tip = "Связка не найдена", CAMERA_CREDENTIALS_REQUIRED
+                else:
+                    text = tip = _bundle_label(bundle)
+                item.setText(COL_BUNDLE, text)
+                item.setToolTip(COL_BUNDLE, tip)
+                if broken:
+                    failed += 1
+                    item.setForeground(COL_BUNDLE, QColor("#dc3545"))
+                else:
+                    item.setForeground(COL_BUNDLE, self.palette().text())
+        finally:
+            self._suppress_item_changed = suppress
+        notice = camera_credentials_notice(failed)
+        if default_failed:
+            notice = " ".join(
+                part
+                for part in ("Связка по умолчанию не найдена.", notice)
+                if part
+            )
+        self._notice_label.setText(notice)
+        self._notice_label.setVisible(bool(notice))
+
+    def _bundles_snapshot(self) -> CameraConfig:
+        """Текущие связки и несохранённый выбор связки по умолчанию."""
+        cfg = CameraConfig()
+        cfg.bundles = self._svc.get_settings().bundles
+        cfg.default_bundle_iid = self._default_bundle_iid()
+        return cfg
 
     # ---------- Превью ----------
 
@@ -918,13 +1067,17 @@ class CameraSettingsDialog(QDialog):
         if self._probe is not None:
             return
         host = item.text(COL_IP).strip()
+        login, password, error = resolve_camera_credentials(
+            self._bundles_snapshot(), "", item.data(COL_BUNDLE, BUNDLE_ROLE) or ""
+        )
         camera = CameraModel(
             "",
             "",
             item.text(COL_CAM),
             host,
-            self._login_edit.text().strip(),
-            self._password_edit.text(),
+            login,
+            password,
+            credential_error=error,
         )
         try:
             _ = camera.rtsp_url
@@ -1023,6 +1176,7 @@ class CameraSettingsDialog(QDialog):
         item = QTreeWidgetItem(parent)
         item.setText(COL_CAM, name)
         item.setText(COL_IP, "0.0.0.0")
+        item.setText(COL_BUNDLE, BUNDLE_DEFAULT_LABEL)
         item.setIcon(COL_CAM, _icon_from_key("camera"))
         item.setData(
             0,
@@ -1081,6 +1235,7 @@ class CameraSettingsDialog(QDialog):
                 name = f"Камера {i}"
                 cam_item.setText(COL_CAM, name)
                 cam_item.setText(COL_IP, getattr(dev, "host", "") or "")
+                cam_item.setText(COL_BUNDLE, BUNDLE_DEFAULT_LABEL)
                 cam_item.setIcon(COL_CAM, _icon_from_key("camera"))
                 addr_name = addr_item.text(COL_ADDR)
                 cab_name = cab_item.text(COL_ADDR)
@@ -1240,6 +1395,7 @@ class CameraSettingsDialog(QDialog):
     def _collect_cameras(self) -> dict:
         cameras: dict = {}
         self._collected_ids = {}
+        self._collected_bundles = {}
         root = self._cam_tree.invisibleRootItem()
         for i in range(root.childCount()):
             addr_item = root.child(i)
@@ -1272,6 +1428,9 @@ class CameraSettingsDialog(QDialog):
                     iid = cam_item.data(0, Qt.ItemDataRole.UserRole + 1) or uuid4().hex
                     cam_item.setData(0, Qt.ItemDataRole.UserRole + 1, iid)
                     self._collected_ids[f"{addr}::{cab}::{name}"] = iid
+                    bundle_iid = cam_item.data(COL_BUNDLE, BUNDLE_ROLE) or ""
+                    if bundle_iid:
+                        self._collected_bundles[iid] = bundle_iid
                     cams[name] = ip
                 if cams:
                     cabinets[cab] = cams
@@ -1308,8 +1467,10 @@ class CameraSettingsDialog(QDialog):
                         return
                     seen.add(cid)
         cfg = CameraConfig(
-            login=self._login_edit.text().strip(),
-            password=self._password_edit.text(),
+            # Связки уже сохранены диалогом связок: берутся текущие.
+            bundles=self._svc.get_settings().bundles,
+            default_bundle_iid=self._default_bundle_iid(),
+            camera_bundles=self._collected_bundles,
             player=self._player_combo.currentText().strip(),
             preview_backend=self._preview_backend_combo.currentData(),
             preview_transport=self._preview_transport_combo.currentData(),
@@ -1389,7 +1550,7 @@ class _CamerasTree(QTreeWidget):
         """При двойном клике редактировать колонку с текстом узла.
 
         Адрес и кабинет → колонка COL_ADDR (текст там). Камера →
-        редактируется та колонка, по которой кликнули (COL_CAM или COL_IP).
+        редактируется та колонка, по которой кликнули (COL_CAM, COL_IP или COL_BUNDLE).
         """
         item = self.itemAt(event.pos())
         if item is None:
@@ -1402,7 +1563,7 @@ class _CamerasTree(QTreeWidget):
             return
         if kind == "cam":
             col = self.columnAt(event.pos().x())
-            if col in (COL_CAM, COL_IP):
+            if col in (COL_CAM, COL_IP, COL_BUNDLE):
                 self.editItem(item, col)
                 event.accept()
                 return

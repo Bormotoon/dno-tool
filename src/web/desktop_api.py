@@ -460,6 +460,8 @@ def install_desktop_routes(
         camera = next((item for item in cameras() if item.iid == iid), None)
         if camera is None:
             raise HTTPException(404, "Камера не найдена")
+        if camera.credential_error:
+            raise HTTPException(409, camera.credential_error)
         try:
             data = await run_in_tracked_executor(
                 pool_getter(),

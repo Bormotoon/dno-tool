@@ -12,6 +12,24 @@ from uuid import uuid4
 
 RTSP_PORT = 554
 
+# Связка камеры (или связка по умолчанию) не найдена среди связок камер.
+CAMERA_CREDENTIALS_REQUIRED = (
+    "Заполните данные для входа камеры: выбранная связка учётных данных "
+    "не найдена. Выберите или создайте связку в настройках камер "
+    "(вкладка «Подключение»)."
+)
+
+
+def camera_credentials_notice(count: int) -> str:
+    """Общее напоминание окна камер; пусто, если все связки найдены."""
+    if count <= 0:
+        return ""
+    return (
+        f"Заполните данные для входа камер (не прошли проверку: {count}): "
+        "выбранная связка учётных данных не найдена. Выберите или создайте "
+        "связку в настройках камер (вкладка «Подключение», колонка «Авторизация»)."
+    )
+
 
 def parse_camera_endpoint(value: str) -> tuple[str, str, int, str]:
     """Разобрать IP/имя, необязательные порт и путь либо RTSP URL без пароля."""
@@ -40,7 +58,7 @@ def parse_camera_endpoint(value: str) -> tuple[str, str, int, str]:
     ):
         raise ValueError("Ожидается адрес RTSP, например 192.0.2.1:554/onvif1")
     if parts.username is not None or parts.password is not None:
-        raise ValueError("Логин и пароль задаются на вкладке «Подключение», отдельно от адреса")
+        raise ValueError("Логин и пароль задаются связкой учётных данных, отдельно от адреса")
     try:
         ipaddress.ip_address(host)
     except ValueError:
@@ -227,6 +245,8 @@ class CameraModel:
     path_mask: str = ""
     file_mask: str = ""
     iid: str = ""
+    # Причина, по которой учётные данные не определены (связка не найдена).
+    credential_error: str = ""
 
     @property
     def identifier(self) -> str:
@@ -242,6 +262,9 @@ class CameraModel:
 
     @property
     def rtsp_url(self) -> str:
+        """URL с учётными данными; без найденной связки — ValueError."""
+        if self.credential_error:
+            raise ValueError(self.credential_error)
         scheme, host, port, path = parse_camera_endpoint(self.ip_address)
         userinfo = (
             f"{quote(self.login, safe='')}:{quote(self.password, safe='')}@"

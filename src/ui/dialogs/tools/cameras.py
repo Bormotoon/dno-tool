@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.architecture import ViewState
+from src.domain.models.camera import camera_credentials_notice
 from src.services.remote.camera_recording import Recording
 from src.ui.dialogs.tools.camera_preview_controller import CameraPreviewController
 from src.ui.dialogs.tools.camera_selector import CameraSelectionDialog
@@ -151,6 +152,12 @@ class CamerasDialog(QWidget):
             error_label = QLabel(self._svc.load_error)
             error_label.setWordWrap(True)
             layout.addWidget(error_label)
+        # Напоминание о камерах, чья связка не прошла проверку.
+        self._credentials_label = QLabel()
+        self._credentials_label.setWordWrap(True)
+        self._credentials_label.setStyleSheet("color: #dc3545;")
+        self._credentials_label.hide()
+        layout.addWidget(self._credentials_label)
         toolbar_widget = QWidget(self)
         toolbar_widget.setFixedHeight(36)
         toolbar_widget.setStyleSheet(FLAT_TOOLBUTTON_QSS)
@@ -277,6 +284,18 @@ class CamerasDialog(QWidget):
             self._set_view_mode(saved_mode)
         self._restoring_wall = False
 
+    def _refresh_credentials_notice(self) -> None:
+        notice = camera_credentials_notice(
+            sum(
+                bool(getattr(record.camera, "credential_error", ""))
+                for record in self._manager.records.values()
+                if not record.removed
+            )
+        )
+        if self._credentials_label.text() != notice:
+            self._credentials_label.setText(notice)
+        self._credentials_label.setVisible(bool(notice))
+
     def _save_wall_state(self) -> None:
         if self._restoring_wall:
             return
@@ -327,7 +346,14 @@ class CamerasDialog(QWidget):
         signature = (
             self._view_mode,
             tuple(
-                (c.identifier, c.caption, c.ip_address, c.login, c.password)
+                (
+                    c.identifier,
+                    c.caption,
+                    c.ip_address,
+                    c.login,
+                    c.password,
+                    c.credential_error,
+                )
                 for c in cameras
             ),
         )
@@ -533,6 +559,7 @@ class CamerasDialog(QWidget):
         self._summary_label.setText(
             f"Камер: {total} • Запись: {active} • Подключение: {waiting}"
         )
+        self._refresh_credentials_notice()
         self._refresh_wall()
 
     def _selected_ids(self):
@@ -555,6 +582,9 @@ class CamerasDialog(QWidget):
     def _view_camera(self):
         camera = self._selected_camera()
         if camera is None:
+            return
+        if camera.credential_error:
+            QMessageBox.warning(self, "Плеер", camera.credential_error)
             return
         player = camera.player.strip()
         if player.lower() in ("", "системный", "system", "default"):
