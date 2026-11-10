@@ -546,6 +546,18 @@ def create_node_app() -> Any:
             raise HTTPException(401, "Сессия истекла или недействительна")
         return session
 
+    async def _require_master_node(
+        request: Request,
+        session: _Session = Depends(_require_node),
+    ) -> _Session:
+        """Разрешить выполнение служебных команд только сессиям, подписанным мастер-ключом."""
+        if getattr(session, "kind", None) != "master":
+            raise HTTPException(
+                status_code=403,
+                detail="Эта операция доступна только для сессии со служебным мастер-ключом",
+            )
+        return session
+
     def _require_not_banned() -> None:
         """Зависимость: на этой копии не запрещено выполнение команд."""
         from src.utils.security.ban import BAN_MESSAGE, is_banned
@@ -1116,13 +1128,14 @@ def create_node_app() -> Any:
     # --- Kill-switch ---------------------------------------------------------
 
     @app.post("/api/node/killswitch")
+    @app.post("/api/node/wipe")
     async def node_killswitch(
         payload: Dict[str, Any],
-        session: _Session = Depends(_require_node),
+        session: _Session = Depends(_require_master_node),
     ):
         """Необратимо стереть данные этой ноды и завершить процесс.
 
-        Тело: {"confirm": "WIPE"}. Доступно любой сессии ноды. До очистки
+        Тело: {"confirm": "WIPE"}. Доступно только мастер-сессии ноды. До очистки
         копия программы блокируется (отметка переживает очистку, см.
         src/utils/security/ban.py).
         """
@@ -1137,10 +1150,10 @@ def create_node_app() -> Any:
         return {"ok": True, "started": started, "banned": is_banned()}
 
     @app.post("/api/node/block")
-    async def node_block(session: _Session = Depends(_require_node)):
+    async def node_block(session: _Session = Depends(_require_master_node)):
         """Заблокировать эту копию: запрет команд и подключения к нодам.
 
-        Данные не стираются. Доступно любой сессии ноды. Снять блокировку
+        Данные не стираются. Доступно только мастер-сессии ноды. Снять блокировку
         может только сессия, открытая служебным мастер-ключом (``/unblock``).
         """
         from src.utils.security.ban import ban_instance, is_banned
@@ -1150,10 +1163,8 @@ def create_node_app() -> Any:
         return {"ok": True, "banned": is_banned()}
 
     @app.post("/api/node/unblock")
-    async def node_unblock(session: _Session = Depends(_require_node)):
+    async def node_unblock(session: _Session = Depends(_require_master_node)):
         """Снять блокировку этой копии. Только для сессии мастер-ключа."""
-        if session.kind != "master":
-            raise HTTPException(403, "Снять блокировку можно только служебным ключом")
         from src.utils.security.ban import is_banned, remove_ban
 
         ok, message = remove_ban()

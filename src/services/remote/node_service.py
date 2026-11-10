@@ -969,7 +969,9 @@ class NodeService(BaseService):
 
     def wipe_remote_node(self, iid: str) -> "tuple[bool, str]":
         """Полная очистка выбранной ноды и её блокировка (блокирующий I/O)."""
-        ok, message, _ = self._service_request(iid, "/api/node/killswitch", {"confirm": "WIPE"})
+        ok, message, _ = self._service_request(
+            iid, "/api/node/killswitch", {"confirm": "WIPE"}, master_only=True
+        )
         if not ok:
             return False, message
         self.stop_client(iid)
@@ -978,7 +980,9 @@ class NodeService(BaseService):
 
     def block_remote_node(self, iid: str) -> "tuple[bool, str]":
         """Заблокировать выбранную ноду без удаления данных (блокирующий I/O)."""
-        ok, message, _ = self._service_request(iid, "/api/node/block", {})
+        ok, message, _ = self._service_request(
+            iid, "/api/node/block", {}, master_only=True
+        )
         if not ok:
             return False, message
         return True, "Нода заблокирована"
